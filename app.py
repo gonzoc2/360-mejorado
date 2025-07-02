@@ -4,7 +4,6 @@ import requests
 from io import BytesIO
 from streamlit_option_menu import option_menu
 import io
-import xlsxwriter
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 import plotly.express as px
 from plotly import graph_objects as go
