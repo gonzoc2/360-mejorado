@@ -2,6 +2,6 @@ streamlit
 pandas
 requests
 streamlit-option-menu
-st-aggrid
+streamlit-aggrid
 plotly
 numpy
