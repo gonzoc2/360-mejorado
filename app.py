@@ -9,7 +9,7 @@ import plotly.express as px
 from plotly import graph_objects as go
 import numpy as np
 import locale
-locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
+locale.setlocale(locale.LC_TIME, 'es_ES')
 from st_aggrid.shared import JsCode
 
 st.set_page_config(
