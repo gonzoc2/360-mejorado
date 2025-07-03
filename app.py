@@ -881,9 +881,10 @@ def seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_selecciona
         for df in [df_histo_cla, df_histo_categoria, df_histo_cuenta]:
             df["Ingreso_Asociado"] = df["Mes_A"].map(ingreso_meses)
             df["Porcentaje %"] = df.apply(
-                lambda row: (row["Neto_A"] / row["Ingreso_Asociado"]) * 100 if row["Neto_A"] != 0 else 0,
+                lambda row: (row["Neto_A"] / row["Ingreso_Asociado"]) * 100 if row["Ingreso_Asociado"] not in [0, None] else 0,
                 axis=1
             )
+
 
         df_histo_cla = df_histo_cla.groupby("Clasificacion_A").agg(Media=("Porcentaje %", 'mean'), Desviación_Estándar=("Porcentaje %", 'std')).reset_index()
         df_histo_cla = df_histo_cla[df_histo_cla["Clasificacion_A"] == clasificacion_nombre]
