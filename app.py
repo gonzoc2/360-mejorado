@@ -1893,12 +1893,6 @@ else:
 
             # Convertir a formato largo para graficar
             df_graficas = tabla_mensual_renombrada.T.reset_index().rename(columns={"index": "Mes"})
-            
-            # 🔧 Limpiar strings tipo '%' y comas de miles para convertir a numérico
-            for col in df_graficas.columns[1:]:
-                df_graficas[col] = df_graficas[col].replace("%", "", regex=True).replace(",", "", regex=True)
-                df_graficas[col] = pd.to_numeric(df_graficas[col], errors="coerce")
-
 
             # Eliminar filas de Total y Promedio
             df_graficas = df_graficas[~df_graficas["Mes"].isin(["Total", "Promedio"])]
