@@ -8,8 +8,6 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 import plotly.express as px
 from plotly import graph_objects as go
 import numpy as np
-import locale
-locale.setlocale(locale.LC_TIME, 'es_ES')
 from st_aggrid.shared import JsCode
 
 st.set_page_config(
@@ -1056,7 +1054,12 @@ else:
 
     ct("ESGARI 360")
     fecha_act = fecha_actualizacion['fecha'].iloc[0]
-    fecha_texto = fecha_act.strftime('%d de %B de %Y')
+    meses = {
+        1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
+        5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
+        9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
+    }
+    fecha_texto = f"{fecha_act.day} de {meses[fecha_act.month]} de {fecha_act.year}"
     texto_centrado(f"Fecha de actualización: {fecha_texto}")
     
     if st.session_state["rol"] == "director" or st.session_state["rol"] == "admin" :
@@ -1619,7 +1622,7 @@ else:
 
 
     elif selected == "PPT":
-        st.write("Bienvenido a la sección de PPT. Aquí puedes ver las presentaciones.")
+        st.write("Bienvenido a la sección de PPT. Aquí puedes ver el presupuesto!")
         estdo_re(df_ppt)
     
     
