@@ -1052,7 +1052,7 @@ else:
             st.session_state[key] = "" if key != "logged_in" else False
         st.rerun()
     if st.session_state['username'] == "gonza" or st.session_state['username'] == "Octavio":
-        if st.sidebar.button("🔄 Limpiar caché y recargar"):
+        if st.sidebar.button("🔄 Recargar datos"):
             st.cache_data.clear()
             st.rerun()
 
