@@ -44,12 +44,12 @@ def ct(texto):
     st.markdown(f"<h1 style='text-align: center;'>{texto}</h1>", unsafe_allow_html=True)
 
 # Descargar Excel desde Google Drive
-EXCEL_URL = st.secrets["urls"]["EXCEL_URL "]
-base_2025 = st.secrets["urls"]["base_2025 "]
-proyectos = st.secrets["urls"]["proyectos "]
-base_ly =  st.secrets["urls"]["base_ly "]
-base_ppt = st.secrets["urls"]["base_ppt "]
-fecha = st.secrets["urls"]["fecha "]
+EXCEL_URL = st.secrets["urls"]["EXCEL_URL"]
+base_2025 = st.secrets["urls"]["base_2025"]
+proyectos = st.secrets["urls"]["proyectos"]
+base_ly =  st.secrets["urls"]["base_ly"]
+base_ppt = st.secrets["urls"]["base_ppt"]
+fecha = st.secrets["urls"]["fecha"]
 
 categorias_felx_com = ['COSTO DE PERSONAL', 'GASTO DE PERSONAL', 'NOMINA ADMINISTRATIVOS']
 da = ['AMORT ARRENDAMIENTO', 'AMORTIZACION', 'DEPRECIACION']
