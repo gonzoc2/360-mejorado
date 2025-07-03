@@ -2013,7 +2013,7 @@ else:
 
 
     elif selected == "Mes Corregido":
-        #texto_centrado("Aqui puedes ver como se veria el mes si tuviera los gastos fijos cargados adecuadamente")
+        texto_centrado("Aqui puedes ver como se veria el mes si tuviera los gastos fijos cargados adecuadamente")
 
         costos_variables = ["FLETES", "CASETAS", "COMBUSTIBLE", "OTROS COSS", "INGRESO"]
         promedio_fijo = st.selectbox("Seleciona que promedio usar para los gastos fijos", ["LM", "YTD", "TRES MESES"])
