@@ -1051,6 +1051,10 @@ else:
         for key in ["logged_in", "username", "rol", "proyectos"]:
             st.session_state[key] = "" if key != "logged_in" else False
         st.rerun()
+    if st.session_state['username'] == "gonza" or st.session_state['username'] == "Octavio":
+        if st.sidebar.button("🔄 Limpiar caché y recargar"):
+            st.cache_data.clear()
+            st.rerun()
 
     ct("ESGARI 360")
     fecha_act = fecha_actualizacion['fecha'].iloc[0]
