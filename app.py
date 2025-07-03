@@ -979,8 +979,7 @@ def seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_selecciona
             use_checkbox=False,
             fit_columns_on_grid_load=True,
             theme="streamlit",
-            meses_key = "-".join(sorted(meses_seleccionado))
-            key = f"agrid_comparativa_{proyecto_codigo}_{meses_key}_{clasificacion_nombre}"
+            key=f"agrid_comparativa_{proyecto_codigo}_{meses_seleccionado}_{clasificacion_nombre}"
         )
         
 init_session_state()
