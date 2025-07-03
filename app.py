@@ -1895,8 +1895,12 @@ else:
             df_graficas = tabla_mensual_renombrada.T.reset_index().rename(columns={"index": "Mes"})
             for col in df_graficas.columns:
                 if col != "Mes":
-                    df_graficas[col] = df_graficas[col].astype(str).str.replace("%", "").str.replace(",", "")
+                    # Solo si hay strings, limpiar
+                    if df_graficas[col].dtype == object:
+                        df_graficas[col] = df_graficas[col].str.replace("%", "", regex=False).str.replace(",", "", regex=False)
+                    # Convertir todos a numérico (sin tocar los que ya lo son)
                     df_graficas[col] = pd.to_numeric(df_graficas[col], errors="coerce")
+
 
             # Eliminar filas de Total y Promedio
             df_graficas = df_graficas[~df_graficas["Mes"].isin(["Total", "Promedio"])]
