@@ -44,12 +44,12 @@ def ct(texto):
     st.markdown(f"<h1 style='text-align: center;'>{texto}</h1>", unsafe_allow_html=True)
 
 # Descargar Excel desde Google Drive
-EXCEL_URL = "https://docs.google.com/spreadsheets/d/10r2hqHaJXH_yQDGtICSDGKFcOOF96b1WFhT8Msdd_Qk/export?format=xlsx"
-base_2025 = "https://docs.google.com/spreadsheets/d/1Ny7GxH1ls6ax2FZqwfdVH-T530vWC7cdOipDrZkyn38/export?format=xlsx"
-proyectos = 'https://docs.google.com/spreadsheets/d/1voBSY8c2OJtVqqOo71GVAz0yhYduR2ONjCWnY_htHVg/export?format=xlsx'
-base_ly =  'https://docs.google.com/spreadsheets/d/1AcFvpegdzV01j8qIimk-j4uS3iEOHKpk/export?format=xlsx'
-base_ppt = 'https://docs.google.com/spreadsheets/d/1vNn_6gBjNEZSU3Phwte19qk19DFW5S8N/export?format=xlsx'
-fecha = 'https://docs.google.com/spreadsheets/d/1loPFsSZ3agTRuUAYWCDXFYtGMjvp6lh8/export?format=xlsx'
+EXCEL_URL = st.secrets["urls"]["EXCEL_URL "]
+base_2025 = st.secrets["urls"]["base_2025 "]
+proyectos = st.secrets["urls"]["proyectos "]
+base_ly =  st.secrets["urls"]["base_ly "]
+base_ppt = st.secrets["urls"]["base_ppt "]
+fecha = st.secrets["urls"]["fecha "]
 
 categorias_felx_com = ['COSTO DE PERSONAL', 'GASTO DE PERSONAL', 'NOMINA ADMINISTRATIVOS']
 da = ['AMORT ARRENDAMIENTO', 'AMORTIZACION', 'DEPRECIACION']
