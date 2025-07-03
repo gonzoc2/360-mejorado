@@ -1892,7 +1892,7 @@ else:
             import plotly.express as px
 
             # Convertir a formato largo para graficar
-            df_graficas = tabla_mensual.T.reset_index().rename(columns={"index": "Mes"})
+            df_graficas = tabla_mensual_renombrada.T.reset_index().rename(columns={"index": "Mes"})
 
             # Eliminar filas de Total y Promedio
             df_graficas = df_graficas[~df_graficas["Mes"].isin(["Total", "Promedio"])]
