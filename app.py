@@ -969,7 +969,8 @@ def seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_selecciona
             gb.configure_column(col, type=["numericColumn"], aggFunc="last", valueFormatter=formatter)
 
         grid_options = gb.build()
-
+        meses_key = "-".join(sorted(meses_seleccionado))
+        grid_key = f"agrid_comparativa_{proyecto_codigo}_{meses_key}_{clasificacion_nombre}"
         AgGrid(
             df_analsiis_com,
             gridOptions=grid_options,
@@ -979,7 +980,7 @@ def seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_selecciona
             use_checkbox=False,
             fit_columns_on_grid_load=True,
             theme="streamlit",
-            key=f"agrid_comparativa_{proyecto_codigo}_{meses_seleccionado}_{clasificacion_nombre}"
+            key=grid_key,
         )
         
 init_session_state()
