@@ -1893,9 +1893,6 @@ else:
 
             # Convertir a formato largo para graficar
             df_graficas = tabla_mensual_renombrada.T.reset_index().rename(columns={"index": "Mes"})
-            for col in df_graficas.columns:
-                if col != "Mes":
-                    df_graficas[col] = pd.to_numeric(df_graficas[col], errors="coerce")
 
 
             # Eliminar filas de Total y Promedio
