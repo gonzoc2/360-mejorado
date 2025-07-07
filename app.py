@@ -1354,276 +1354,273 @@ else:
         col1, col2 = st.columns(2)
         meses_seleccionado = filtro_meses(col1, df_2025)
         proyecto_codigo, proyecto_nombre = filtro_pro(col2)
-        if not meses_seleccionado:
-            st.error("Favor de seleccionar por lo menos un mes")
-        else:
 
-            er = estado_resultado(df_2025, meses_seleccionado, proyecto_nombre, proyecto_codigo, list_pro)
-    
-            if st.session_state['rol'] == "gerente":
-                            metricas_seleccionadas = [
-                    ("Ingreso", "ingreso_proyecto"),
-                    ("COSS", "coss_pro"),
-                    ("COSS Patio", "patio_pro"),
-                    ("COSS Total", "coss_total"),
-                    ("Utilidad Bruta", "utilidad_bruta"),
-                    ("G.ADMN", "gadmn_pro"),
-                    ("Utilidad Operativa", "utilidad_operativa"),
-                ]
+        er = estado_resultado(df_2025, meses_seleccionado, proyecto_nombre, proyecto_codigo, list_pro)
+
+        if st.session_state['rol'] == "gerente":
+                        metricas_seleccionadas = [
+                ("Ingreso", "ingreso_proyecto"),
+                ("COSS", "coss_pro"),
+                ("COSS Patio", "patio_pro"),
+                ("COSS Total", "coss_total"),
+                ("Utilidad Bruta", "utilidad_bruta"),
+                ("G.ADMN", "gadmn_pro"),
+                ("Utilidad Operativa", "utilidad_operativa"),
+            ]
+        
+        else:
+            metricas_seleccionadas = [
+                ("Ingreso", "ingreso_proyecto"),
+                ("COSS", "coss_pro"),
+                ("COSS Patio", "patio_pro"),
+                ("COSS Total", "coss_total"),
+                ("Utilidad Bruta", "utilidad_bruta"),
+                ("G.ADMN", "gadmn_pro"),
+                ("Utilidad Operativa", "utilidad_operativa"),
+                ("OH", "oh_pro"),
+                ("EBIT", "ebit"),
+                ("Gasto Fin", "gasto_fin_pro"),
+                ("Ingreso Fin", "ingreso_fin_pro"),
+                ("EBT", "ebt"),
+            ]     
+
+        def tabla_er(metricas_seleccionadas, er, columa):
+            valor_ingreso = er.get("ingreso_proyecto", None)
+            df_data = []
+            for nombre_metrica, clave in metricas_seleccionadas:
+                valor = er.get(clave, None)
+                # Paso 2: calcular % sobre ingreso (evitando división por cero)
+                porcentaje_sobre_ingreso = valor / valor_ingreso if valor_ingreso and isinstance(valor, (int, float)) else None
+                fila = {
+                    "Concepto": nombre_metrica,
+                    columa: valor,
+                    "% sobre Ingreso": 1.0 if clave == "ingreso_proyecto" else porcentaje_sobre_ingreso
+                }
+                df_data.append(fila)
+
+            df_tabla = pd.DataFrame(df_data)
+            return df_tabla
+        
+        meses = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+        if len(meses_seleccionado) != 1 or meses_seleccionado[0] == "ene.":
+            tipo_com = st.selectbox("Seleccione el tipo de comparativa:", ["LY", "PPT"])
+        else:
+            tipo_com = st.selectbox("Seleccione el tipo de comparativa:", ["LY", "PPT", "LM"])
+
+        if tipo_com == "LY":
+            er_ly = estado_resultado(df_ly, meses_seleccionado, proyecto_nombre, proyecto_codigo, list_pro)
+            df_compara = tabla_er(metricas_seleccionadas, er_ly, "LY")
+            df_compara.drop(columns=["% sobre Ingreso"], inplace=True)
+            df_agrid = df_ly[df_ly['Mes_A'].isin(meses_seleccionado)]
+            df_agrid = df_agrid[df_agrid['Proyecto_A'].isin(proyecto_codigo)]
+
+        elif tipo_com == "PPT":
+            er_ppt = estado_resultado(df_ppt, meses_seleccionado, proyecto_nombre, proyecto_codigo, list_pro)
+            df_compara = tabla_er(metricas_seleccionadas, er_ppt, "PPT")
+            df_compara.drop(columns=["% sobre Ingreso"], inplace=True)
+            df_agrid = df_ppt[df_ppt['Mes_A'].isin(meses_seleccionado)]
+            df_agrid = df_agrid[df_agrid['Proyecto_A'].isin(proyecto_codigo)]
+
+        else:
+            indice_mes = meses.index(meses_seleccionado[0])
+            mes_anterior = meses[indice_mes - 1]
+            er_lm = estado_resultado(df_2025, [mes_anterior], proyecto_nombre, proyecto_codigo, list_pro)
+            df_compara = tabla_er(metricas_seleccionadas, er_lm, "LM")
+            df_compara.drop(columns=["% sobre Ingreso"], inplace=True)
+            df_agrid = df_2025[df_2025['Mes_A'] == mes_anterior]
+            df_agrid = df_agrid[df_agrid['Proyecto_A'].isin(proyecto_codigo)]
+
+        
+        df_tabla = tabla_er(metricas_seleccionadas, er, "YTD")
+        df_tabla.drop(columns=["% sobre Ingreso"], inplace=True)
+        df_compara = pd.merge(df_tabla, df_compara, on="Concepto", how="outer", suffixes=("", f"_{tipo_com}"))
+        # Definir los nombres de las columnas comparadas
+        col_ytd = "YTD"
+        col_com = tipo_com  # Será "LY", "PPT" o "LM" dependiendo del selectbox
+
+        # Verificar que ambas columnas existen antes de aplicar el cálculo
+        if col_ytd in df_compara.columns and col_com in df_compara.columns:
+            df_compara["Variación % "] = df_compara.apply(
+                lambda row: ((row[col_ytd] - row[col_com]) / row[col_com]) * 100
+                if pd.notnull(row[col_ytd]) and pd.notnull(row[col_com]) and row[col_com] != 0
+                else 0,
+                axis=1
+            )
+        df_compara = df_compara.set_index("Concepto", drop=True)
+        def formato_monetario(valor):
+            return "${:,.0f}".format(valor) if pd.notnull(valor) else ""
+
+        def formato_porcentaje(valor):
+            return "{:.2f}%".format(valor) if pd.notnull(valor) else ""
+
+        # --- Formatear columnas ---
+        for col in df_compara.columns:
+            if col in ["YTD", "LY", "PPT", "LM"]:
+                df_compara[col] = df_compara[col].apply(formato_monetario)
+            elif "Variación %" in col:
+                df_compara[col] = df_compara[col].apply(formato_porcentaje)
+
+        # --- Identificador de tabla ---
+        i = 1
+
+        # --- Estilo sin bordes y texto alineado a la izquierda ---
+        st.markdown(f"""
+            <style>
+            .tab-table-{i} {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 10px 0;
+                font-size: 13px;
+                font-family: Arial, sans-serif;
+                text-align: left;
+            }}
+            .tab-table-{i} th {{
+                background-color: #003366;
+                color: white;
+                text-transform: uppercase;
+                text-align: left;
+                padding: 10px;
+                border: none;
+            }}
+            .tab-table-{i} td {{
+                padding: 8px;
+                text-align: left;
+                border: none;
+            }}
+            .tab-table-{i} tr:nth-child(1),
+            .tab-table-{i} tr:nth-child(5),
+            .tab-table-{i} tr:nth-child(7),
+            .tab-table-{i} tr:nth-child(9),
+            .tab-table-{i} tr:nth-child(12) {{
+                background-color: #003366;
+                color: white;
+            }}
+            .tab-table-{i} tr:nth-child(2),
+            .tab-table-{i} tr:nth-child(3),
+            .tab-table-{i} tr:nth-child(4),
+            .tab-table-{i} tr:nth-child(6),
+            .tab-table-{i} tr:nth-child(8),
+            .tab-table-{i} tr:nth-child(10),
+            .tab-table-{i} tr:nth-child(11) {{
+                background-color: white;
+                color: black;
+            }}
+            .tab-table-{i} tr:hover {{
+                background-color: #00509E;
+                color: white;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
+
+        # --- Convertir a HTML y mostrar ---
+        tabla_html = df_compara.reset_index().to_html(
+            index=False,
+            escape=False,
+            classes=f"tab-table-{i}",
+            border=0
+        )
+        st.markdown(tabla_html, unsafe_allow_html=True)
+        df_grafico = df_compara.copy()
+
+        # Quitar formato monetario para columnas de comparación
+        for col in ["YTD", tipo_com]:
+            df_grafico[col] = df_grafico[col].replace('[\$,]', '', regex=True).astype(float)
+
+        # Limpiar porcentaje
+        df_grafico["Variación % "] = df_grafico["Variación % "].replace('%', '', regex=True).astype(float)
+
+        # Orden opcional
+        df_grafico = df_grafico.sort_values(by="YTD", ascending=False)
+
+        # === GRÁFICO DE BARRAS COMPARATIVO CON FORMATO $ ===
+        fig_comp = go.Figure()
+
+        fig_comp.add_trace(go.Bar(
+            x=df_grafico.index,
+            y=df_grafico["YTD"],
+            name="YTD",
+            marker_color="#003366",
+            text=df_grafico["YTD"].apply(lambda x: f"${x:,.0f}"),
+            textposition="auto"
+        ))
+
+        fig_comp.add_trace(go.Bar(
+            x=df_grafico.index,
+            y=df_grafico[tipo_com],
+            name=tipo_com,
+            marker_color="#b0b0b0",
+            text=df_grafico[tipo_com].apply(lambda x: f"${x:,.0f}"),
+            textposition="auto"
+        ))
+
+        fig_comp.update_layout(
+            title=f"Comparativa YTD vs {tipo_com}",
+            xaxis_title="Concepto",
+            yaxis_title="Monto ($)",
+            barmode='group',
+            height=500,
+            template="plotly_white",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+
+        st.plotly_chart(fig_comp, use_container_width=True)
+
+
+        # === GRÁFICO DE VARIACIÓN % ===
+        fig_var = px.bar(
+            df_grafico.reset_index(),
+            x="Concepto",
+            y="Variación % ",
+            title="Variación porcentual entre YTD y " + tipo_com,
+            color="Variación % ",
+            color_continuous_scale="RdBu_r",
+            text="Variación % ",
+            height=400
+        )
+
+        fig_var.update_layout(
+            yaxis_title="Variación %",
+            xaxis_title="Concepto",
+            template="plotly_white"
+        )
+        fig_var.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
+
+        st.plotly_chart(fig_var, use_container_width=True)
+
+        ventanas = ['INGRESO', 'COSS', 'G.ADMN', 'GASTOS FINANCIEROS', 'INGRESO FINANCIERO']
+        tabs = st.tabs(ventanas)
+        with tabs[0]:
+            tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, "Categoria_A", "INGRESO", "Tabla de Ingresos")
+
+        with tabs[1]:
+            tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, "Clasificacion_A", "COSS", "Tabla de COSS")
             
-            else:
-                metricas_seleccionadas = [
-                    ("Ingreso", "ingreso_proyecto"),
-                    ("COSS", "coss_pro"),
-                    ("COSS Patio", "patio_pro"),
-                    ("COSS Total", "coss_total"),
-                    ("Utilidad Bruta", "utilidad_bruta"),
-                    ("G.ADMN", "gadmn_pro"),
-                    ("Utilidad Operativa", "utilidad_operativa"),
-                    ("OH", "oh_pro"),
-                    ("EBIT", "ebit"),
-                    ("Gasto Fin", "gasto_fin_pro"),
-                    ("Ingreso Fin", "ingreso_fin_pro"),
-                    ("EBT", "ebt"),
-                ]     
-    
-            def tabla_er(metricas_seleccionadas, er, columa):
-                valor_ingreso = er.get("ingreso_proyecto", None)
-                df_data = []
-                for nombre_metrica, clave in metricas_seleccionadas:
-                    valor = er.get(clave, None)
-                    # Paso 2: calcular % sobre ingreso (evitando división por cero)
-                    porcentaje_sobre_ingreso = valor / valor_ingreso if valor_ingreso and isinstance(valor, (int, float)) else None
-                    fila = {
-                        "Concepto": nombre_metrica,
-                        columa: valor,
-                        "% sobre Ingreso": 1.0 if clave == "ingreso_proyecto" else porcentaje_sobre_ingreso
-                    }
-                    df_data.append(fila)
-    
-                df_tabla = pd.DataFrame(df_data)
-                return df_tabla
+        with tabs[2]:
+            tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, "Clasificacion_A", "G.ADMN", "Tabla de G.ADMN")
             
-            meses = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
-            if len(meses_seleccionado) != 1 or meses_seleccionado[0] == "ene.":
-                tipo_com = st.selectbox("Seleccione el tipo de comparativa:", ["LY", "PPT"])
-            else:
-                tipo_com = st.selectbox("Seleccione el tipo de comparativa:", ["LY", "PPT", "LM"])
-    
-            if tipo_com == "LY":
-                er_ly = estado_resultado(df_ly, meses_seleccionado, proyecto_nombre, proyecto_codigo, list_pro)
-                df_compara = tabla_er(metricas_seleccionadas, er_ly, "LY")
-                df_compara.drop(columns=["% sobre Ingreso"], inplace=True)
-                df_agrid = df_ly[df_ly['Mes_A'].isin(meses_seleccionado)]
-                df_agrid = df_agrid[df_agrid['Proyecto_A'].isin(proyecto_codigo)]
-    
-            elif tipo_com == "PPT":
-                er_ppt = estado_resultado(df_ppt, meses_seleccionado, proyecto_nombre, proyecto_codigo, list_pro)
-                df_compara = tabla_er(metricas_seleccionadas, er_ppt, "PPT")
-                df_compara.drop(columns=["% sobre Ingreso"], inplace=True)
-                df_agrid = df_ppt[df_ppt['Mes_A'].isin(meses_seleccionado)]
-                df_agrid = df_agrid[df_agrid['Proyecto_A'].isin(proyecto_codigo)]
-    
-            else:
-                indice_mes = meses.index(meses_seleccionado[0])
-                mes_anterior = meses[indice_mes - 1]
-                er_lm = estado_resultado(df_2025, [mes_anterior], proyecto_nombre, proyecto_codigo, list_pro)
-                df_compara = tabla_er(metricas_seleccionadas, er_lm, "LM")
-                df_compara.drop(columns=["% sobre Ingreso"], inplace=True)
-                df_agrid = df_2025[df_2025['Mes_A'] == mes_anterior]
-                df_agrid = df_agrid[df_agrid['Proyecto_A'].isin(proyecto_codigo)]
-    
+        with tabs[3]:
+            tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, "Clasificacion_A", "GASTOS FINANCIEROS", "Tabla de Gastos Financieros")
             
-            df_tabla = tabla_er(metricas_seleccionadas, er, "YTD")
-            df_tabla.drop(columns=["% sobre Ingreso"], inplace=True)
-            df_compara = pd.merge(df_tabla, df_compara, on="Concepto", how="outer", suffixes=("", f"_{tipo_com}"))
-            # Definir los nombres de las columnas comparadas
-            col_ytd = "YTD"
-            col_com = tipo_com  # Será "LY", "PPT" o "LM" dependiendo del selectbox
-    
-            # Verificar que ambas columnas existen antes de aplicar el cálculo
-            if col_ytd in df_compara.columns and col_com in df_compara.columns:
-                df_compara["Variación % "] = df_compara.apply(
-                    lambda row: ((row[col_ytd] - row[col_com]) / row[col_com]) * 100
-                    if pd.notnull(row[col_ytd]) and pd.notnull(row[col_com]) and row[col_com] != 0
-                    else 0,
-                    axis=1
-                )
-            df_compara = df_compara.set_index("Concepto", drop=True)
-            def formato_monetario(valor):
-                return "${:,.0f}".format(valor) if pd.notnull(valor) else ""
-    
-            def formato_porcentaje(valor):
-                return "{:.2f}%".format(valor) if pd.notnull(valor) else ""
-    
-            # --- Formatear columnas ---
-            for col in df_compara.columns:
-                if col in ["YTD", "LY", "PPT", "LM"]:
-                    df_compara[col] = df_compara[col].apply(formato_monetario)
-                elif "Variación %" in col:
-                    df_compara[col] = df_compara[col].apply(formato_porcentaje)
-    
-            # --- Identificador de tabla ---
-            i = 1
-    
-            # --- Estilo sin bordes y texto alineado a la izquierda ---
-            st.markdown(f"""
-                <style>
-                .tab-table-{i} {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin: 10px 0;
-                    font-size: 13px;
-                    font-family: Arial, sans-serif;
-                    text-align: left;
-                }}
-                .tab-table-{i} th {{
-                    background-color: #003366;
-                    color: white;
-                    text-transform: uppercase;
-                    text-align: left;
-                    padding: 10px;
-                    border: none;
-                }}
-                .tab-table-{i} td {{
-                    padding: 8px;
-                    text-align: left;
-                    border: none;
-                }}
-                .tab-table-{i} tr:nth-child(1),
-                .tab-table-{i} tr:nth-child(5),
-                .tab-table-{i} tr:nth-child(7),
-                .tab-table-{i} tr:nth-child(9),
-                .tab-table-{i} tr:nth-child(12) {{
-                    background-color: #003366;
-                    color: white;
-                }}
-                .tab-table-{i} tr:nth-child(2),
-                .tab-table-{i} tr:nth-child(3),
-                .tab-table-{i} tr:nth-child(4),
-                .tab-table-{i} tr:nth-child(6),
-                .tab-table-{i} tr:nth-child(8),
-                .tab-table-{i} tr:nth-child(10),
-                .tab-table-{i} tr:nth-child(11) {{
-                    background-color: white;
-                    color: black;
-                }}
-                .tab-table-{i} tr:hover {{
-                    background-color: #00509E;
-                    color: white;
-                }}
-                </style>
-            """, unsafe_allow_html=True)
-    
-            # --- Convertir a HTML y mostrar ---
-            tabla_html = df_compara.reset_index().to_html(
-                index=False,
-                escape=False,
-                classes=f"tab-table-{i}",
-                border=0
-            )
-            st.markdown(tabla_html, unsafe_allow_html=True)
-            df_grafico = df_compara.copy()
-    
-            # Quitar formato monetario para columnas de comparación
-            for col in ["YTD", tipo_com]:
-                df_grafico[col] = df_grafico[col].replace('[\$,]', '', regex=True).astype(float)
-    
-            # Limpiar porcentaje
-            df_grafico["Variación % "] = df_grafico["Variación % "].replace('%', '', regex=True).astype(float)
-    
-            # Orden opcional
-            df_grafico = df_grafico.sort_values(by="YTD", ascending=False)
-    
-            # === GRÁFICO DE BARRAS COMPARATIVO CON FORMATO $ ===
-            fig_comp = go.Figure()
-    
-            fig_comp.add_trace(go.Bar(
-                x=df_grafico.index,
-                y=df_grafico["YTD"],
-                name="YTD",
-                marker_color="#003366",
-                text=df_grafico["YTD"].apply(lambda x: f"${x:,.0f}"),
-                textposition="auto"
-            ))
-    
-            fig_comp.add_trace(go.Bar(
-                x=df_grafico.index,
-                y=df_grafico[tipo_com],
-                name=tipo_com,
-                marker_color="#b0b0b0",
-                text=df_grafico[tipo_com].apply(lambda x: f"${x:,.0f}"),
-                textposition="auto"
-            ))
-    
-            fig_comp.update_layout(
-                title=f"Comparativa YTD vs {tipo_com}",
-                xaxis_title="Concepto",
-                yaxis_title="Monto ($)",
-                barmode='group',
-                height=500,
-                template="plotly_white",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-            )
-    
-            st.plotly_chart(fig_comp, use_container_width=True)
-    
-    
-            # === GRÁFICO DE VARIACIÓN % ===
-            fig_var = px.bar(
-                df_grafico.reset_index(),
-                x="Concepto",
-                y="Variación % ",
-                title="Variación porcentual entre YTD y " + tipo_com,
-                color="Variación % ",
-                color_continuous_scale="RdBu_r",
-                text="Variación % ",
-                height=400
-            )
-    
-            fig_var.update_layout(
-                yaxis_title="Variación %",
-                xaxis_title="Concepto",
-                template="plotly_white"
-            )
-            fig_var.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
-    
-            st.plotly_chart(fig_var, use_container_width=True)
-    
-            ventanas = ['INGRESO', 'COSS', 'G.ADMN', 'GASTOS FINANCIEROS', 'INGRESO FINANCIERO']
-            tabs = st.tabs(ventanas)
-            with tabs[0]:
-                tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, "Categoria_A", "INGRESO", "Tabla de Ingresos")
-    
-            with tabs[1]:
-                tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, "Clasificacion_A", "COSS", "Tabla de COSS")
-                
-            with tabs[2]:
-                tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, "Clasificacion_A", "G.ADMN", "Tabla de G.ADMN")
-                
-            with tabs[3]:
-                tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, "Clasificacion_A", "GASTOS FINANCIEROS", "Tabla de Gastos Financieros")
-                
-            with tabs[4]:
-                tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, "Categoria_A", "INGRESO POR REVALUACION CAMBIARIA", "Tabla de Ingreso Financiero")
-                
-    
-        elif selected == "Análisis":
-            st.write("Bienvenido a la sección de Análisis. Aquí puedes realizar un análisis detallado de los datos.")
-            col1, col2 = st.columns(2)
-            meses_seleccionado = filtro_meses(col1, df_2025)
-            proyecto_codigo, proyecto_nombre = filtro_pro(col2)
-            if proyecto_nombre == "OFICINAS LUNA" or proyecto_nombre == "PATIO" or proyecto_nombre == "OFICINAS ANDARES":
-                st.error("Este tipo de análisis no es posible para este Proyecto")
-            else:
-                seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, "COSS")
-                seccion_analisis_especial_porcentual(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, patio, "Patio")
-                seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, "G.ADMN")
-                
-                if st.session_state['rol'] == "director" or st.session_state['rol'] == "admin":
-                    seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, "GASTOS FINANCIEROS")
-                    seccion_analisis_especial_porcentual(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, oh, "OH")
-    
+        with tabs[4]:
+            tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, "Categoria_A", "INGRESO POR REVALUACION CAMBIARIA", "Tabla de Ingreso Financiero")
+            
+
+    elif selected == "Análisis":
+        st.write("Bienvenido a la sección de Análisis. Aquí puedes realizar un análisis detallado de los datos.")
+        col1, col2 = st.columns(2)
+        meses_seleccionado = filtro_meses(col1, df_2025)
+        proyecto_codigo, proyecto_nombre = filtro_pro(col2)
+        if proyecto_nombre == "OFICINAS LUNA" or proyecto_nombre == "PATIO" or proyecto_nombre == "OFICINAS ANDARES":
+            st.error("Este tipo de análisis no es posible para este Proyecto")
+        else:
+            seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, "COSS")
+            seccion_analisis_especial_porcentual(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, patio, "Patio")
+            seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, "G.ADMN")
+            
+            if st.session_state['rol'] == "director" or st.session_state['rol'] == "admin":
+                seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, "GASTOS FINANCIEROS")
+                seccion_analisis_especial_porcentual(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, oh, "OH")
+
 
     elif selected == "Proyeccion":
         st.write("Bienvenido a la sección de Proyección. Aquí puedes ver las proyecciones de los proyectos.")
