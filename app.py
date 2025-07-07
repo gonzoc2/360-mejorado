@@ -1906,6 +1906,26 @@ else:
 
             # Eliminar filas de Total y Promedio
             df_graficas = df_graficas[~df_graficas["Mes"].isin(["Total", "Promedio"])]
+            # Detectar columnas de porcentaje formateado y convertir a float
+            columnas_porcentaje = [col for col in df_graficas.columns if col.startswith("%")]
+            
+            for col in columnas_porcentaje:
+                df_graficas[col] = (
+                    df_graficas[col]
+                    .astype(str)
+                    .str.replace("%", "", regex=False)
+                    .replace("", np.nan)
+                    .astype(float)
+                )
+            
+            # Asegurar que todos los conceptos estén en float si son numéricos
+            for col in df_graficas.columns:
+                if col != "Mes":
+                    try:
+                        df_graficas[col] = pd.to_numeric(df_graficas[col], errors="coerce")
+                    except Exception:
+                        pass  # deja la columna como está si no se puede convertir
+
 
             # Variables por rol
             es_gerente = st.session_state.get("rol") == "gerente"
