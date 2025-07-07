@@ -2010,6 +2010,16 @@ else:
                     default=["Ingresos"] if "Ingresos" in conceptos_disponibles else []
                 )
 
+                # Convertir strings de porcentaje a float antes de graficar
+                for col in seleccion:
+                    if "%" in col:
+                        df_graficas[col] = (
+                            df_graficas[col]
+                            .astype(str)
+                            .str.replace("%", "", regex=False)
+                            .astype(float)
+                        )
+                
                 if seleccion:
                     fig_custom = px.line(
                         df_graficas,
