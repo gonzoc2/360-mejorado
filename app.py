@@ -613,173 +613,178 @@ def tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_selecc
 def estdo_re(df_2025):
     col1, col2 = st.columns(2)
     meses_seleccionado = filtro_meses(col1, df_2025)
+    
     proyecto_codigo, proyecto_nombre = filtro_pro(col2)
 
-    er = estado_resultado(df_2025, meses_seleccionado, proyecto_nombre, proyecto_codigo, list_pro)
-
-    if st.session_state['rol'] == "gerente":
-                    metricas_seleccionadas = [
-            ("Ingreso", "ingreso_proyecto"),
-            ("COSS", "coss_pro"),
-            ("COSS Patio", "patio_pro"),
-            ("COSS Total", "coss_total"),
-            ("Utilidad Bruta", "utilidad_bruta"),
-            ("G.ADMN", "gadmn_pro"),
-            ("Utilidad Operativa", "utilidad_operativa"),
-        ]
-    
+    if not meses_seleccionado:
+        st.error("Favor de seleccionar por lo menos un mes")
     else:
-        metricas_seleccionadas = [
-            ("Ingreso", "ingreso_proyecto"),
-            ("COSS", "coss_pro"),
-            ("COSS Patio", "patio_pro"),
-            ("COSS Total", "coss_total"),
-            ("Utilidad Bruta", "utilidad_bruta"),
-            ("G.ADMN", "gadmn_pro"),
-            ("Utilidad Operativa", "utilidad_operativa"),
-            ("OH", "oh_pro"),
-            ("EBIT", "ebit"),
-            ("Gasto Fin", "gasto_fin_pro"),
-            ("Ingreso Fin", "ingreso_fin_pro"),
-            ("EBT", "ebt"),
-        ]
 
-    valor_ingreso = er.get("ingreso_proyecto", None)
-
-    df_data = []
-    for nombre_metrica, clave in metricas_seleccionadas:
-        valor = er.get(clave, None)
-        # Paso 2: calcular % sobre ingreso (evitando división por cero)
-        porcentaje_sobre_ingreso = valor / valor_ingreso if valor_ingreso and isinstance(valor, (int, float)) else None
-        fila = {
-            "Concepto": nombre_metrica,
-            "Valor": valor,
-            "% sobre Ingreso": 1.0 if clave == "ingreso_proyecto" else porcentaje_sobre_ingreso
-        }
-        df_data.append(fila)
-
-    df_tabla = pd.DataFrame(df_data)
-
-    # Paso 1: Formatear columnas
-    df_tabla["Valor"] = df_tabla["Valor"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) and isinstance(x, (int, float, float)) else x)
-    df_tabla["% sobre Ingreso"] = df_tabla["% sobre Ingreso"].apply(lambda x: f"{x:.2%}" if pd.notnull(x) and isinstance(x, (int, float)) else x)
-
-    # Paso 2: Definir identificador único
-    i = 1  # puedes cambiarlo si tienes más tablas en la misma vista
-
-    # Paso 3: Estilo CSS personalizado
-    st.markdown(f"""
-        <style>
-        .tab-table-{i} {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 13px;
-            text-align: left;
-        }}
-        .tab-table-{i} th {{
-            background-color: #003366;
-            color: white;
-            text-transform: uppercase;
-            text-align: left;
-            padding: 10px;
-        }}
-        .tab-table-{i} td {{
-            padding: 8px;
-        }}
-        .tab-table-{i} tr:nth-child(1), 
-        .tab-table-{i} tr:nth-child(5), 
-        .tab-table-{i} tr:nth-child(7),
-        .tab-table-{i} tr:nth-child(9),
-
-        .tab-table-{i} tr:nth-child(12) {{
-            background-color: #003366;
-            color: white;
-        }}
+        er = estado_resultado(df_2025, meses_seleccionado, proyecto_nombre, proyecto_codigo, list_pro)
+    
+        if st.session_state['rol'] == "gerente":
+                        metricas_seleccionadas = [
+                ("Ingreso", "ingreso_proyecto"),
+                ("COSS", "coss_pro"),
+                ("COSS Patio", "patio_pro"),
+                ("COSS Total", "coss_total"),
+                ("Utilidad Bruta", "utilidad_bruta"),
+                ("G.ADMN", "gadmn_pro"),
+                ("Utilidad Operativa", "utilidad_operativa"),
+            ]
         
-        .tab-table-{i} tr:nth-child(2),
-        .tab-table-{i} tr:nth-child(3),
-        .tab-table-{i} tr:nth-child(4),
-        .tab-table-{i} tr:nth-child(6),
-        .tab-table-{i} tr:nth-child(8),
-        .tab-table-{i} tr:nth-child(10),
-        .tab-table-{i} tr:nth-child(11),
-        .tab-table-{i} tr:nth-child(8) {{
-            background-color: white;
-            color: black;
-        }}
-        .tab-table-{i} tr:hover {{
-            background-color: #00509E;
-            color: white;
-        }}
-        </style>
-    """, unsafe_allow_html=True)
-
-    # Paso 4: Convertir a HTML y mostrar
-    html_table = df_tabla.to_html(index=False, escape=False, classes=f"tab-table-{i}")
-    st.markdown(html_table, unsafe_allow_html=True)
-
-    descargar_excel(df_tabla, nombre_archivo="estado_resultado.xlsx")
-
-
-
-    ventanas = ['INGRESO', 'COSS', 'G.ADMN', 'GASTOS FINANCIEROS', 'INGRESO FINANCIERO']
-    tabs = st.tabs(ventanas)
-    with tabs[0]:
-        tabla_expandible(df_2025, "INGRESO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ingresos")
-    with tabs[1]:
-        tabla_expandible(df_2025, "COSS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_coss")
-    with tabs[2]:
-        tabla_expandible(df_2025, "G.ADMN", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_g.admn")
-    with tabs[3]:
-        tabla_expandible(df_2025, "GASTOS FINANCIEROS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_gfin")
-    with tabs[4]:
-        tabla_expandible(df_2025, "INGRESO FINANCIERO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ifin")
-
-    # ====== GRAFICOS ======
-    df_numerico = pd.DataFrame([
-        {
-            "Concepto": nombre_metrica,
-            "Valor": er.get(clave, 0),
-            "% sobre Ingreso": er.get(clave, 0) / valor_ingreso if valor_ingreso else 0
-        }
-        for nombre_metrica, clave in metricas_seleccionadas
-    ])
-
-    # Gráfico de barras horizontal
-    fig_bar = px.bar(
-        df_numerico,
-        x="Valor",
-        y="Concepto",
-        orientation='h',
-        text=df_numerico["% sobre Ingreso"].apply(lambda x: f"{x:.2%}"),
-        labels={"Valor": "Monto", "Concepto": "Concepto"},
-        title="Estado de Resultado (Monto y % sobre Ingreso)"
-    )
-    fig_bar.update_traces(marker_color="#00509E", textposition='outside')
-    st.plotly_chart(fig_bar, use_container_width=True)
-
-    # Gráfico de cascada (solo para usuarios no-gerentes)
-    if st.session_state['rol'] != "gerente":
-        conceptos = []
-        valores = []
-        for clave in ["ingreso_proyecto", "coss_total", "utilidad_bruta", "gadmn_pro", "utilidad_operativa", "oh_pro", "ebit", "gasto_fin_pro", "ingreso_fin_pro", "ebt"]:
-            nombre = [n for n, k in metricas_seleccionadas if k == clave]
-            if nombre and er.get(clave) is not None:
-                conceptos.append(nombre[0])
-                valores.append(er[clave])
-
-        fig_waterfall = go.Figure(go.Waterfall(
-            name="Estado de Resultado",
-            orientation="v",
-            measure=["relative"] * len(valores),
-            x=conceptos,
-            text=[f"${v:,.0f}" for v in valores],
-            y=valores,
-            connector={"line": {"color": "gray"}}
-        ))
-        fig_waterfall.update_layout(title="Flujo de Utilidad (Gráfico de Cascada)", showlegend=False)
-        st.plotly_chart(fig_waterfall, use_container_width=True)
+        else:
+            metricas_seleccionadas = [
+                ("Ingreso", "ingreso_proyecto"),
+                ("COSS", "coss_pro"),
+                ("COSS Patio", "patio_pro"),
+                ("COSS Total", "coss_total"),
+                ("Utilidad Bruta", "utilidad_bruta"),
+                ("G.ADMN", "gadmn_pro"),
+                ("Utilidad Operativa", "utilidad_operativa"),
+                ("OH", "oh_pro"),
+                ("EBIT", "ebit"),
+                ("Gasto Fin", "gasto_fin_pro"),
+                ("Ingreso Fin", "ingreso_fin_pro"),
+                ("EBT", "ebt"),
+            ]
+    
+        valor_ingreso = er.get("ingreso_proyecto", None)
+    
+        df_data = []
+        for nombre_metrica, clave in metricas_seleccionadas:
+            valor = er.get(clave, None)
+            # Paso 2: calcular % sobre ingreso (evitando división por cero)
+            porcentaje_sobre_ingreso = valor / valor_ingreso if valor_ingreso and isinstance(valor, (int, float)) else None
+            fila = {
+                "Concepto": nombre_metrica,
+                "Valor": valor,
+                "% sobre Ingreso": 1.0 if clave == "ingreso_proyecto" else porcentaje_sobre_ingreso
+            }
+            df_data.append(fila)
+    
+        df_tabla = pd.DataFrame(df_data)
+    
+        # Paso 1: Formatear columnas
+        df_tabla["Valor"] = df_tabla["Valor"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) and isinstance(x, (int, float, float)) else x)
+        df_tabla["% sobre Ingreso"] = df_tabla["% sobre Ingreso"].apply(lambda x: f"{x:.2%}" if pd.notnull(x) and isinstance(x, (int, float)) else x)
+    
+        # Paso 2: Definir identificador único
+        i = 1  # puedes cambiarlo si tienes más tablas en la misma vista
+    
+        # Paso 3: Estilo CSS personalizado
+        st.markdown(f"""
+            <style>
+            .tab-table-{i} {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 10px 0;
+                font-size: 13px;
+                text-align: left;
+            }}
+            .tab-table-{i} th {{
+                background-color: #003366;
+                color: white;
+                text-transform: uppercase;
+                text-align: left;
+                padding: 10px;
+            }}
+            .tab-table-{i} td {{
+                padding: 8px;
+            }}
+            .tab-table-{i} tr:nth-child(1), 
+            .tab-table-{i} tr:nth-child(5), 
+            .tab-table-{i} tr:nth-child(7),
+            .tab-table-{i} tr:nth-child(9),
+    
+            .tab-table-{i} tr:nth-child(12) {{
+                background-color: #003366;
+                color: white;
+            }}
+            
+            .tab-table-{i} tr:nth-child(2),
+            .tab-table-{i} tr:nth-child(3),
+            .tab-table-{i} tr:nth-child(4),
+            .tab-table-{i} tr:nth-child(6),
+            .tab-table-{i} tr:nth-child(8),
+            .tab-table-{i} tr:nth-child(10),
+            .tab-table-{i} tr:nth-child(11),
+            .tab-table-{i} tr:nth-child(8) {{
+                background-color: white;
+                color: black;
+            }}
+            .tab-table-{i} tr:hover {{
+                background-color: #00509E;
+                color: white;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
+    
+        # Paso 4: Convertir a HTML y mostrar
+        html_table = df_tabla.to_html(index=False, escape=False, classes=f"tab-table-{i}")
+        st.markdown(html_table, unsafe_allow_html=True)
+    
+        descargar_excel(df_tabla, nombre_archivo="estado_resultado.xlsx")
+    
+    
+    
+        ventanas = ['INGRESO', 'COSS', 'G.ADMN', 'GASTOS FINANCIEROS', 'INGRESO FINANCIERO']
+        tabs = st.tabs(ventanas)
+        with tabs[0]:
+            tabla_expandible(df_2025, "INGRESO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ingresos")
+        with tabs[1]:
+            tabla_expandible(df_2025, "COSS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_coss")
+        with tabs[2]:
+            tabla_expandible(df_2025, "G.ADMN", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_g.admn")
+        with tabs[3]:
+            tabla_expandible(df_2025, "GASTOS FINANCIEROS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_gfin")
+        with tabs[4]:
+            tabla_expandible(df_2025, "INGRESO FINANCIERO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ifin")
+    
+        # ====== GRAFICOS ======
+        df_numerico = pd.DataFrame([
+            {
+                "Concepto": nombre_metrica,
+                "Valor": er.get(clave, 0),
+                "% sobre Ingreso": er.get(clave, 0) / valor_ingreso if valor_ingreso else 0
+            }
+            for nombre_metrica, clave in metricas_seleccionadas
+        ])
+    
+        # Gráfico de barras horizontal
+        fig_bar = px.bar(
+            df_numerico,
+            x="Valor",
+            y="Concepto",
+            orientation='h',
+            text=df_numerico["% sobre Ingreso"].apply(lambda x: f"{x:.2%}"),
+            labels={"Valor": "Monto", "Concepto": "Concepto"},
+            title="Estado de Resultado (Monto y % sobre Ingreso)"
+        )
+        fig_bar.update_traces(marker_color="#00509E", textposition='outside')
+        st.plotly_chart(fig_bar, use_container_width=True)
+    
+        # Gráfico de cascada (solo para usuarios no-gerentes)
+        if st.session_state['rol'] != "gerente":
+            conceptos = []
+            valores = []
+            for clave in ["ingreso_proyecto", "coss_total", "utilidad_bruta", "gadmn_pro", "utilidad_operativa", "oh_pro", "ebit", "gasto_fin_pro", "ingreso_fin_pro", "ebt"]:
+                nombre = [n for n, k in metricas_seleccionadas if k == clave]
+                if nombre and er.get(clave) is not None:
+                    conceptos.append(nombre[0])
+                    valores.append(er[clave])
+    
+            fig_waterfall = go.Figure(go.Waterfall(
+                name="Estado de Resultado",
+                orientation="v",
+                measure=["relative"] * len(valores),
+                x=conceptos,
+                text=[f"${v:,.0f}" for v in valores],
+                y=valores,
+                connector={"line": {"color": "gray"}}
+            ))
+            fig_waterfall.update_layout(title="Flujo de Utilidad (Gráfico de Cascada)", showlegend=False)
+            st.plotly_chart(fig_waterfall, use_container_width=True)
 
 def texto_centrado(texto):
     st.markdown(f"<div style='text-align: center;'>{texto}</div>", unsafe_allow_html=True)
