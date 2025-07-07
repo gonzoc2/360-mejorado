@@ -2003,24 +2003,20 @@ else:
             # --- TAB 4: Gráfica Personalizada ---
             with tabs[3]:
                 st.subheader("Gráfica personalizada")
-
                 seleccion = st.multiselect(
                     "Selecciona conceptos para graficar:",
                     options=conceptos_disponibles,
                     default=["Ingresos"] if "Ingresos" in conceptos_disponibles else []
                 )
-
-                # Convertir strings de porcentaje a float antes de graficar
-                for col in seleccion:
-                    if "%" in col:
-                        df_graficas[col] = (
-                            df_graficas[col]
-                            .astype(str)
-                            .str.replace("%", "", regex=False)
-                            .astype(float)
-                        )
-                
                 if seleccion:
+                    # Conversión dinámica de porcentajes
+                    for col in seleccion:
+                        if isinstance(df_graficas.loc[0, col], str) and "%" in col:
+                            df_graficas[col] = (
+                                df_graficas[col]
+                                .str.replace("%", "", regex=False)
+                                .astype(float)
+                            )
                     fig_custom = px.line(
                         df_graficas,
                         x="Mes",
