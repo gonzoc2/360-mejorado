@@ -2013,34 +2013,65 @@ else:
                 else:
                     st.info("No hay márgenes disponibles para graficar.")
 
-            # --- TAB 4: Gráfica Personalizada ---
-            with tabs[3]:
-                st.subheader("Gráfica personalizada")
-                seleccion = st.multiselect(
-                    "Selecciona conceptos para graficar:",
-                    options=conceptos_disponibles,
-                    default=["Ingresos"] if "Ingresos" in conceptos_disponibles else []
-                )
-                if seleccion:
-                    # Conversión dinámica de porcentajes
-                    for col in seleccion:
-                        if isinstance(df_graficas.loc[0, col], str) and "%" in col:
-                            df_graficas[col] = (
-                                df_graficas[col]
-                                .str.replace("%", "", regex=False)
-                                .astype(float)
-                            )
-                    fig_custom = px.line(
-                        df_graficas,
-                        x="Mes",
-                        y=seleccion,
-                        markers=True,
-                        title="Evolución de conceptos seleccionados",
-                        labels={"value": "Monto", "variable": "Concepto"}
+                from plotly.subplots import make_subplots
+                import plotly.graph_objects as go
+                
+                # --- TAB 4: Gráfica Personalizada con doble eje Y ---
+                with tabs[3]:
+                    st.subheader("Gráfica personalizada")
+                
+                    seleccion = st.multiselect(
+                        "Selecciona conceptos para graficar:",
+                        options=conceptos_disponibles,
+                        default=["Ingresos"] if "Ingresos" in conceptos_disponibles else []
                     )
-                    st.plotly_chart(fig_custom, use_container_width=True)
-                else:
-                    st.info("Selecciona al menos un concepto para visualizar.")
+                
+                    if seleccion:
+                        # Separar métricas monetarias y porcentuales
+                        porcentuales = [col for col in seleccion if col.startswith("%")]
+                        monetarias = [col for col in seleccion if not col.startswith("%")]
+                
+                        fig = make_subplots(specs=[[{"secondary_y": True}]])
+                
+                        # Agregar trazos monetarios
+                        for col in monetarias:
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=df_graficas["Mes"],
+                                    y=df_graficas[col],
+                                    name=col,
+                                    mode='lines+markers'
+                                ),
+                                secondary_y=False
+                            )
+                
+                        # Agregar trazos porcentuales
+                        for col in porcentuales:
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=df_graficas["Mes"],
+                                    y=df_graficas[col],
+                                    name=col,
+                                    mode='lines+markers',
+                                    line=dict(dash='dot')
+                                ),
+                                secondary_y=True
+                            )
+                
+                        # Etiquetas de ejes
+                        fig.update_yaxes(title_text="Monto ($ MXN)", secondary_y=False)
+                        fig.update_yaxes(title_text="Porcentaje (%)", secondary_y=True)
+                
+                        fig.update_layout(
+                            title="Evolución de conceptos seleccionados",
+                            xaxis_title="Mes",
+                            legend_title="Conceptos",
+                            hovermode="x unified"
+                        )
+                
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("Selecciona al menos un concepto para visualizar.")
 
 
     elif selected == "Mes Corregido":
