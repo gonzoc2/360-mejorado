@@ -1232,7 +1232,6 @@ else:
     list_pro = proyectos["proyectos"].tolist()
     # Ya ha iniciado sesión
     st.sidebar.success(f"👤 Usuario: {st.session_state['username']}")
-    st.sidebar.info(f"🔐 Rol: {st.session_state['rol']}")
 
     if st.sidebar.button("Cerrar sesión"):
         for key in ["logged_in", "username", "rol", "proyectos"]:
