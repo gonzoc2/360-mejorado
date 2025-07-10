@@ -1242,7 +1242,7 @@ else:
         if st.sidebar.button("🔄 Recargar datos"):
             st.cache_data.clear()
             st.rerun()
-        if st.session_state["username"] == "gonza" or st.session_state["username"] == "Octavio" or st.session_state["username"] == "Karla" or st.session_state["username"] == "Roman":
+    if st.session_state["username"] == "gonza" or st.session_state["username"] == "Octavio" or st.session_state["username"] == "Karla" or st.session_state["username"] == "Roman":
         link_360 = "https://drive.google.com/file/d/1ZQkWXHE9sakW9NL7eUfz8gOh8dg1L5w2/view?usp=sharing"
         def get_direct_link(shareable_link):
             # Extraer el ID del enlace compartido
