@@ -1108,15 +1108,15 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
 
     # 🧩 Tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Utilidad Operativa Objetivo (24%)",
+        "Proyeccion Lineal,
         "Utilidad  Minima Esperada (Punto de Equilibrio)",
         "Ingreso Manual",
         "Utilidad EBT esperada (11.5%)",
-        "Proyección Lineal"
+        "Utilidad Operativa Objetivo (24%)"
     ])
 
     # Tab 1: UO = 24%
-    with tab1:
+    with tab5:
         df_ext_var_24 = df_ext_var.copy()
         df_ext_var_24["Neto_A"] = df_ext_var_24["Neto_normalizado"] * ingreso_uo_24
         df_ext_var_24 = df_ext_var_24.drop(columns=["Neto_normalizado"])
@@ -1160,7 +1160,7 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
         construir_tabla(ingreso_ebt_115, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=4)
 
     # Tab 5: Original sin ajuste
-    with tab5:
+    with tab1:
         st.write("Proyección Lienal")
         construir_tabla(ingreso_pro_fut, coss_pro_ori, gadmn_pro_ori, oh_pro, intereses, id_tab=5)
 
