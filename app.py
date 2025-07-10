@@ -1111,7 +1111,7 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
         "Proyeccion Lineal",
         "Utilidad  Minima Esperada (Punto de Equilibrio)",
         "Ingreso Manual",
-        "Utilidad EBT esperada (11.5%)",
+        "Utilidad esperada",
         "Utilidad Operativa Objetivo (24%)"
     ])
 
@@ -1134,7 +1134,7 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
         df_junto = pd.concat([df_ext_var_0, df_sum], ignore_index=True)
         coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
         gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
-        st.write(f"Ingreso necesario para que EBT = 0: **${ingreso_ebt_0:,.2f}**")
+        st.write(f"Ingreso necesario para alcanzar Punto de Equilibrio = 0: **${ingreso_ebt_0:,.2f}**")
         construir_tabla(ingreso_ebt_0, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=2)
 
     # Tab 3: ingreso manual
@@ -1156,7 +1156,7 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
         df_junto = pd.concat([df_ext_var_115, df_sum], ignore_index=True)
         coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
         gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
-        st.write(f"Ingreso necesario para que EBT sea 11.5%: **${ingreso_ebt_115:,.2f}**")
+        st.write(f"Ingreso necesario para Utilidad Esperada: **${ingreso_ebt_115:,.2f}**")
         construir_tabla(ingreso_ebt_115, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=4)
 
     # Tab 5: Original sin ajuste
