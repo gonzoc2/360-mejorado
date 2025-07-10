@@ -1092,10 +1092,19 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
                 f"{delta:.2%}"
             ]
         })
+        if st.session_state["rol"] == "gerente":
+            conceptos_ocultos = ["OH", "EBIT", "Intereses", "% EBT", "EBT"]
+            resumen_df = resumen_df[~resumen_df["Concepto"].isin(conceptos_ocultos)]
+
         mostrar_tabla_estilizada(resumen_df, id=id_tab)
-        st.bar_chart(pd.DataFrame({
-            "Valor ($)": [ingreso_obj, coss, gadm, utilidad_op, ebt],
-        }, index=["Ingresos", "COSS", "GADM", "Util. Operativa", "EBT"]))
+        if st.session_state["rol"] == "gerente":
+            st.bar_chart(pd.DataFrame({
+            "Valor ($)": [ingreso_obj, coss, gadm, utilidad_op],
+        }, index=["Ingresos", "COSS", "GADM", "Util. Operativa"]))
+        else:
+            st.bar_chart(pd.DataFrame({
+                "Valor ($)": [ingreso_obj, coss, gadm, utilidad_op, ebt],
+            }, index=["Ingresos", "COSS", "GADM", "Util. Operativa", "EBT"]))
 
     # 🧩 Tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
