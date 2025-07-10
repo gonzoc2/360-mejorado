@@ -1242,6 +1242,45 @@ else:
         if st.sidebar.button("🔄 Recargar datos"):
             st.cache_data.clear()
             st.rerun()
+        if st.session_state["username"] == "gonza" or st.session_state["username"] == "Octavio" or st.session_state["username"] == "Karla" or st.session_state["username"] == "Roman":
+        link_360 = "https://drive.google.com/file/d/1ZQkWXHE9sakW9NL7eUfz8gOh8dg1L5w2/view?usp=sharing"
+        def get_direct_link(shareable_link):
+            # Extraer el ID del enlace compartido
+            file_id = shareable_link.split("/d/")[1].split("/")[0]
+            return f"https://drive.google.com/uc?id={file_id}"
+        excel_360 = get_direct_link(link_360)
+        @st.cache_data
+        def download_file_from_drive(url):
+            response = requests.get(url)
+            if response.status_code == 200:
+                return response.content
+            else:
+                st.error("Error al descargar el archivo.")
+                return None
+        # Mostrar botones de descarga para cada archivo
+        def create_download_buttons():
+            # Diccionario de enlaces con nombres de archivos
+            files = {
+                "Excel P&L 360.xlsm": excel_360,
+            }
+
+            for file_name, file_url in files.items():
+                # Descargar el archivo desde el enlace de Google Drive
+            
+                file_data = download_file_from_drive(file_url)
+                
+                # Mostrar el botón de descarga
+                if file_data:
+                    st.sidebar.download_button(
+                        label=f"Descargar {file_name}",
+                        data=file_data,
+                        file_name=file_name,
+                        mime="application/vnd.ms-excel.sheet.macroEnabled.12",  # MIME type para .xlsm
+                    )
+
+
+        # Crear los botones de descarga
+        create_download_buttons()
 
     ct("ESGARI 360")
     fecha_act = fecha_actualizacion['fecha'].iloc[0]
