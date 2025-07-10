@@ -1253,11 +1253,18 @@ else:
     fecha_texto = f"{fecha_act.day} de {meses[fecha_act.month]} de {fecha_act.year}"
     texto_centrado(f"Fecha de actualización: {fecha_texto}")
     
-    if st.session_state["rol"] == "director" or st.session_state["rol"] == "admin" :
+    if st.session_state["rol"] in ["director", "admin"] and "ESGARI" in st.session_state["proyectos"]:
         selected = option_menu(
         menu_title=None,
         options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido"],
         icons=["house", "clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar"],
+        default_index=0,
+        orientation="horizontal",)
+    if st.session_state["rol"] == "director" or st.session_state["rol"] == "admin":
+        selected = option_menu(
+        menu_title=None,
+        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido"],
+        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar"],
         default_index=0,
         orientation="horizontal",)
     if st.session_state["rol"] == "gerente":
