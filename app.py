@@ -99,7 +99,7 @@ def filtro_meses(col, df_2025):
     if selected == "Análisis":
         meses_seleccionado = col.selectbox("Selecciona un mes", meses)
         meses_seleccionado = [meses_seleccionado]
-    elif selected == "Mes Corregido":
+    elif selected == "Mes Corregido" or selected == "Proyeccion":
         meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
                 "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
 
@@ -987,6 +987,177 @@ def seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_selecciona
             theme="streamlit",
             key=grid_key,
         )
+
+def mostrar_tabla_estilizada(df, id=1):
+    df_tabla = df.copy()
+
+    # Formato condicional para celdas con $ y %
+    df_tabla["Valor"] = df_tabla["Valor"].apply(
+        lambda x: f"${float(x.replace('$','').replace(',','')):,.2f}" if "$" in x else x
+    )
+    df_tabla["Valor"] = df_tabla["Valor"].apply(
+        lambda x: f'<span style="color:#003366;">{x}</span>' if "%" in x else x
+    )
+
+    # CSS personalizado
+    st.markdown(f"""
+        <style>
+        .tab-table-{id} {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 13px;
+            text-align: left;
+            border: 1px solid #ccc;
+            font-family: sans-serif;
+        }}
+        .tab-table-{id} th {{
+            background-color: #003366;
+            color: white;
+            text-transform: uppercase;
+            text-align: left;
+            padding: 10px;
+        }}
+        .tab-table-{id} td {{
+            padding: 8px;
+            background-color: white;
+            color: black;
+        }}
+        .tab-table-{id} tr:nth-child(5) td,
+        .tab-table-{id} tr:nth-child(10) td {{
+            background-color: #003366 !important;
+            color: white !important;
+            font-weight: bold;
+        }}
+        .tab-table-{id} tr:nth-child(5) td span,
+        .tab-table-{id} tr:nth-child(10) td span {{
+            color: white !important;
+        }}
+        .tab-table-{id} tr td:nth-child(2):has(span) {{
+            color: #003366;
+            font-weight: bold;
+        }}
+        .tab-table-{id} tr:hover {{
+            background-color: #00509E;
+            color: white;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
+
+    html_table = df_tabla.to_html(index=False, escape=False, classes=f"tab-table-{id}")
+    st.markdown(html_table, unsafe_allow_html=True)
+    descargar_excel(df, nombre_archivo=f"proyeccion{id}.xlsx")
+
+def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro_ori, gadmn_pro_ori):
+    variable = df_ext_var["Neto_normalizado"].sum()
+    fijos_uo = df_sum[df_sum["Clasificacion_A"].isin(["G.ADMN", "COSS"])]["Neto_A"].sum() + patio_pro
+    fijos_ebt = fijos_uo + oh_pro + intereses
+    ingreso_uo_24 = fijos_uo / (1- variable - .24)
+    ingreso_ebt_115 = fijos_ebt / (1 - variable - .115)
+    ingreso_ebt_0 = fijos_ebt / (1 - variable)
+    
+    def construir_tabla(ingreso_obj, coss, gadm, oh, interes, id_tab):
+        utilidad_op = ingreso_obj - coss - gadm
+        por_util_op = utilidad_op / ingreso_obj if ingreso_obj else 0
+        ebit = utilidad_op - oh
+        ebt = ebit - interes
+        por_ebt = ebt / ingreso_obj if ingreso_obj else 0
+        delta = (ingreso_obj - ingreso_pro_fut) / ingreso_pro_fut if ingreso_pro_fut else 0
+
+        resumen_df = pd.DataFrame({
+            "Concepto": [
+                "Ingresos Proyectados",
+                "COSS",
+                "Gastos Administrativos",
+                "Utilidad Operativa",
+                "% Utilidad Operativa",
+                "OH",
+                "EBIT",
+                "Intereses",
+                "EBT",
+                "% EBT",
+                "Δ Ingreso %"
+            ],
+            "Valor": [
+                f"${ingreso_obj:,.2f}",
+                f"${coss:,.2f}",
+                f"${gadm:,.2f}",
+                f"${utilidad_op:,.2f}",
+                f"{por_util_op:.2%}",
+                f"${oh:,.2f}",
+                f"${ebit:,.2f}",
+                f"${interes:,.2f}",
+                f"${ebt:,.2f}",
+                f"{por_ebt:.2%}",
+                f"{delta:.2%}"
+            ]
+        })
+        mostrar_tabla_estilizada(resumen_df, id=id_tab)
+        st.bar_chart(pd.DataFrame({
+            "Valor ($)": [ingreso_obj, coss, gadm, utilidad_op, ebt],
+        }, index=["Ingresos", "COSS", "GADM", "Util. Operativa", "EBT"]))
+
+    # 🧩 Tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Utilidad Operativa Objetivo (24%)",
+        "Utilidad  Minima Esperada (Punto de Equilibrio)",
+        "Ingreso Manual",
+        "Utilidad EBT esperada (11.5%)",
+        "Proyección Lineal"
+    ])
+
+    # Tab 1: UO = 24%
+    with tab1:
+        df_ext_var_24 = df_ext_var.copy()
+        df_ext_var_24["Neto_A"] = df_ext_var_24["Neto_normalizado"] * ingreso_uo_24
+        df_ext_var_24 = df_ext_var_24.drop(columns=["Neto_normalizado"])
+        df_junto = pd.concat([df_ext_var_24, df_sum], ignore_index=True)
+        coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
+        gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+        st.write(f"Ingreso necesario para U. Operativa = 24%: **${ingreso_uo_24:,.2f}**")
+        construir_tabla(ingreso_uo_24, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=1)
+
+    # Tab 2: EBT = 0
+    with tab2:
+        df_ext_var_0 = df_ext_var.copy()
+        df_ext_var_0["Neto_A"] = df_ext_var_0["Neto_normalizado"] * ingreso_ebt_0
+        df_ext_var_0 = df_ext_var_0.drop(columns=["Neto_normalizado"])
+        df_junto = pd.concat([df_ext_var_0, df_sum], ignore_index=True)
+        coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
+        gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+        st.write(f"Ingreso necesario para que EBT = 0: **${ingreso_ebt_0:,.2f}**")
+        construir_tabla(ingreso_ebt_0, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=2)
+
+    # Tab 3: ingreso manual
+    with tab3:
+        ingreso_manual = st.number_input("💰 Ingreso Manual", value=float(ingreso_pro_fut), step=500000.0, format="%.2f")
+        df_ext_var_manual = df_ext_var.copy()
+        df_ext_var_manual["Neto_A"] = df_ext_var_manual["Neto_normalizado"] * ingreso_manual
+        df_ext_var_manual = df_ext_var_manual.drop(columns=["Neto_normalizado"])
+        df_junto = pd.concat([df_ext_var_manual, df_sum], ignore_index=True)
+        coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
+        gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+        construir_tabla(ingreso_manual, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=3)
+
+    # Tab 4: % EBT = 11.5%
+    with tab4:
+        df_ext_var_115 = df_ext_var.copy()
+        df_ext_var_115["Neto_A"] = df_ext_var_115["Neto_normalizado"] * ingreso_ebt_115
+        df_ext_var_115 = df_ext_var_115.drop(columns=["Neto_normalizado"])
+        df_junto = pd.concat([df_ext_var_115, df_sum], ignore_index=True)
+        coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
+        gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+        st.write(f"Ingreso necesario para que EBT sea 11.5%: **${ingreso_ebt_115:,.2f}**")
+        construir_tabla(ingreso_ebt_115, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=4)
+
+    # Tab 5: Original sin ajuste
+    with tab5:
+        st.write("Proyección Lienal")
+        construir_tabla(ingreso_pro_fut, coss_pro_ori, gadmn_pro_ori, oh_pro, intereses, id_tab=5)
+
+
+
+
         
 init_session_state()
 # App principal
@@ -1628,7 +1799,226 @@ else:
 
     elif selected == "Proyeccion":
         st.write("Bienvenido a la sección de Proyección. Aquí puedes ver las proyecciones de los proyectos.")
-        # Aquí puedes agregar más lógica para mostrar proyecciones
+
+        costos_variables = ["FLETES", "CASETAS", "COMBUSTIBLE", "OTROS COSS", "INGRESO"]
+        col1, col2 = st.columns(2)
+        promedio_fijo = col1.selectbox("Seleciona que promedio usar para los gastos fijos", ["LM", "YTD", "TRES MESES"])
+        promedio_variables = col2.selectbox("Seleciona que promedio usar para los gastos variables", ["Mes actual","LM", "YTD", "TRES MESES"])
+        meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
+                "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+        meses_disponibles = [mes for mes in meses_ordenados if mes in df_2025["Mes_A"].unique()]
+        mes_ant = meses_disponibles[-2] if meses_disponibles else None
+        mes_act = meses_disponibles[-1] if meses_disponibles else None
+        df_mes = df_2025[df_2025["Mes_A"] == mes_act]
+        mes = filtro_meses(col1, df_mes)
+        codigo_pro, pro = filtro_pro(col2)
+        fecha_act = fecha_actualizacion['fecha'].iloc[0].day
+        fecha_completa = fecha_actualizacion['fecha'].iloc[0]
+        ultimo_dia_mes = (fecha_completa + pd.offsets.MonthEnd(0)).day
+
+
+        if promedio_fijo == "LM":
+            
+            df_ext = df_2025[df_2025["Mes_A"] == mes_ant]
+            df_ext = df_ext[~(df_ext["Categoria_A"].isin(costos_variables))]
+            df_ext = df_ext[df_ext["Proyecto_A"].isin(codigo_pro)]
+            df_ext = df_ext[~df_ext["Proyecto_A"].isin(["8002", "8003", "8004"])]
+            df_ext["Mes_A"] = mes_act
+            df_ext["Neto_A"] = df_ext["Neto_A"]
+            df_sum = df_ext
+            patio_pro = patio(df_2025, [mes_ant], codigo_pro, pro)
+            oh_pro = oh(df_2025, [mes_ant], codigo_pro, pro)
+         
+        elif promedio_fijo == "YTD":
+
+            df_ext = df_2025[df_2025["Mes_A"] != mes_act]
+            df_ext = df_ext[~(df_ext["Categoria_A"].isin(costos_variables))]
+            df_ext = df_ext[df_ext["Proyecto_A"].isin(codigo_pro)]
+            df_ext = df_ext[~df_ext["Proyecto_A"].isin(["8002", "8003", "8004"])]
+            numero_meses = df_ext['Mes_A'].nunique()
+
+            columns = ['Empresa_A', 'CeCo_A', 'Proyecto_A', 'Cuenta_A', 
+                    'Clasificacion_A', 'Cuenta_Nombre_A', 'Categoria_A']
+
+            # Paso 1: Agrupamos incluyendo 'Mes_A' y sumamos 'Neto_A'
+            df_sum = df_ext.groupby(columns, as_index=False)['Neto_A'].sum()
+
+            df_sum['Neto_A'] = df_sum['Neto_A']/numero_meses
+            df_sum["Mes_A"] = mes_act
+            df_sum["Neto_A"] = df_sum["Neto_A"]
+            meses_previos = df_ext["Mes_A"].unique().tolist()
+            patio_pro = patio(df_2025, meses_previos, codigo_pro, pro) / numero_meses
+            oh_pro = oh(df_2025, meses_previos, codigo_pro, pro) / numero_meses
+  
+        elif promedio_fijo == "TRES MESES":
+
+            # Identificamos los 3 meses anteriores al mes actual
+            idx_mes_act = meses_ordenados.index(mes_act)
+            meses_previos = meses_ordenados[max(0, idx_mes_act - 3):idx_mes_act]
+
+            # Filtramos gastos fijos (no variables) de los 3 meses anteriores
+            df_ext = df_2025[df_2025["Mes_A"].isin(meses_previos)]
+            df_ext = df_ext[~(df_ext["Categoria_A"].isin(costos_variables))]
+            df_ext = df_ext[df_ext["Proyecto_A"].isin(codigo_pro)]
+            df_ext = df_ext[~df_ext["Proyecto_A"].isin(["8002", "8003", "8004"])]
+
+            numero_meses = df_ext['Mes_A'].nunique()  # Seguridad por si faltan meses
+
+            columns = ['Empresa_A', 'CeCo_A', 'Proyecto_A', 'Cuenta_A',
+                    'Clasificacion_A', 'Cuenta_Nombre_A', 'Categoria_A']
+
+            # Agrupamos y sumamos los gastos fijos por combinación clave
+            df_sum = df_ext.groupby(columns, as_index=False)['Neto_A'].sum()
+
+            if numero_meses > 0:
+                # Calculamos el promedio mensual de los 3 meses
+                df_sum['Neto_A'] = df_sum['Neto_A'] / numero_meses
+
+                # Proyectamos al mes actual, ajustado al día corrido
+                df_sum["Mes_A"] = mes_act
+                df_sum["Neto_A"] = df_sum["Neto_A"]
+                patio_pro = patio(df_2025, meses_previos, codigo_pro, pro) / numero_meses
+                oh_pro = oh(df_2025, meses_previos, codigo_pro, pro) / numero_meses
+
+            else:
+                st.warning("No hay suficientes meses anteriores para calcular el promedio de 3 meses.")
+        
+        if promedio_variables == "Mes actual":
+            df_ext_var = df_2025[df_2025["Mes_A"] == mes_act]
+            df_ext_var = df_ext_var[df_ext_var["Categoria_A"].isin(costos_variables)]
+            df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
+            
+            ingreso_pro = df_ext_var[df_ext_var["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
+            df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
+            df_ext_var = df_ext_var[~df_ext_var["Categoria_A"].isin(["INGRESO"])]
+             
+            ingreso_pro_fut = ingreso_pro / fecha_act  * ultimo_dia_mes
+            df_ext_var["Neto_A"] = df_ext_var["Neto_normalizado"] * ingreso_pro_fut
+            variable = df_ext_var["Neto_normalizado"].sum()
+            df_junto = pd.concat([df_ext_var, df_sum], ignore_index=True)
+
+            coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
+            
+            gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+
+            ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
+            intereses = df_junto[df_junto["Clasificacion_A"] == "GASTOS FINANCIEROS"]["Neto_A"].sum() - df_junto[df_junto["Categoria_A"].isin(ingreso_fin_cue)]["Neto_A"].sum()
+
+            utilidad_operativa = ingreso_pro_fut - coss_pro - gadmn_pro
+            por_uo = utilidad_operativa / ingreso_pro_fut if ingreso_pro_fut != 0 else 0 
+            ebit = utilidad_operativa - oh_pro
+            ebt = ebit - intereses
+            por_ebt = ebt / ingreso_pro_fut if ingreso_pro_fut != 0 else 0
+            
+            proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro)
+
+        elif promedio_variables == "LM":
+            df_ext_var = df_2025[df_2025["Mes_A"] == mes_ant]
+            df_ext_var = df_ext_var[df_ext_var["Categoria_A"].isin(costos_variables)]
+            df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
+            ingreso_pro = df_ext_var[df_ext_var["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
+            df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
+            df_ext_var = df_ext_var[~df_ext_var["Categoria_A"].isin(["INGRESO"])]
+            
+            df_ing_futu = df_2025[df_2025["Mes_A"] == mes_act]
+            df_ing_futu = df_ing_futu[df_ing_futu["Proyecto_A"].isin(codigo_pro)]
+            df_ing_futu = df_ing_futu[df_ing_futu["Categoria_A"] == "INGRESO"]
+            ingreso_pro_fut = df_ing_futu["Neto_A"].sum() / fecha_act * ultimo_dia_mes
+            
+            df_ext_var["Neto_A"] = df_ext_var["Neto_normalizado"] * ingreso_pro_fut
+
+            variable = df_ext_var["Neto_normalizado"].sum()
+            
+            df_junto = pd.concat([df_ext_var, df_sum], ignore_index=True)
+
+            coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
+            
+            gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+
+            ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
+            intereses = df_junto[df_junto["Clasificacion_A"] == "GASTOS FINANCIEROS"]["Neto_A"].sum() - df_junto[df_junto["Categoria_A"].isin(ingreso_fin_cue)]["Neto_A"].sum()
+
+            utilidad_operativa = ingreso_pro_fut - coss_pro - gadmn_pro
+            por_uo = utilidad_operativa / ingreso_pro_fut if ingreso_pro_fut != 0 else 0 
+            ebit = utilidad_operativa - oh_pro
+            ebt = ebit - intereses
+            por_ebt = ebt / ingreso_pro_fut if ingreso_pro_fut != 0 else 0
+            
+            
+            proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro)
+
+        elif promedio_variables == "YTD":
+            df_ext_var = df_2025[df_2025["Mes_A"] != mes_act]
+            df_ext_var = df_ext_var[df_ext_var["Categoria_A"].isin(costos_variables)]
+            df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
+            ingreso_pro = df_ext_var[df_ext_var["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
+            df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
+            df_ext_var = df_ext_var[~df_ext_var["Categoria_A"].isin(["INGRESO"])]
+             
+            df_ing_futu = df_2025[df_2025["Mes_A"] == mes_act]
+            df_ing_futu = df_ing_futu[df_ing_futu["Proyecto_A"].isin(codigo_pro)]
+            df_ing_futu = df_ing_futu[df_ing_futu["Categoria_A"] == "INGRESO"]
+            ingreso_pro_fut = df_ing_futu["Neto_A"].sum() / fecha_act * ultimo_dia_mes
+            df_ext_var["Neto_A"] = df_ext_var["Neto_normalizado"] * ingreso_pro_fut
+
+            variable = df_ext_var["Neto_normalizado"].sum()
+            
+            df_junto = pd.concat([df_ext_var, df_sum], ignore_index=True)
+
+            coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
+            
+            gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+
+            ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
+            intereses = df_junto[df_junto["Clasificacion_A"] == "GASTOS FINANCIEROS"]["Neto_A"].sum() - df_junto[df_junto["Categoria_A"].isin(ingreso_fin_cue)]["Neto_A"].sum()
+
+            utilidad_operativa = ingreso_pro_fut - coss_pro - gadmn_pro
+            por_uo = utilidad_operativa / ingreso_pro_fut if ingreso_pro_fut != 0 else 0 
+            ebit = utilidad_operativa - oh_pro
+            ebt = ebit - intereses
+            por_ebt = ebt / ingreso_pro_fut if ingreso_pro_fut != 0 else 0
+            
+            
+            proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro)
+            
+        elif promedio_variables == "TRES MESES":
+            # Identificamos los 3 meses anteriores al mes actual
+            idx_mes_act = meses_ordenados.index(mes_act)
+            meses_previos = meses_ordenados[max(0, idx_mes_act - 3):idx_mes_act]
+
+            # Filtramos gastos variables de los 3 meses anteriores
+            df_ext_var = df_2025[df_2025["Mes_A"].isin(meses_previos)]
+            df_ext_var = df_ext_var[df_ext_var["Categoria_A"].isin(costos_variables)]
+            df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
+            numero_meses = df_ext_var['Mes_A'].nunique()
+            if numero_meses > 0:
+
+                ingreso_pro = df_ext_var[df_ext_var["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
+                df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
+                df_ext_var = df_ext_var[~df_ext_var["Categoria_A"].isin(["INGRESO"])]
+                
+                df_ing_futu = df_2025[df_2025["Mes_A"] == mes_act]
+                df_ing_futu = df_ing_futu[df_ing_futu["Proyecto_A"].isin(codigo_pro)]
+                df_ing_futu = df_ing_futu[df_ing_futu["Categoria_A"] == "INGRESO"]
+                ingreso_pro_fut = df_ing_futu["Neto_A"].sum() / fecha_act * ultimo_dia_mes
+                df_ext_var["Neto_A"] = df_ext_var["Neto_normalizado"] * ingreso_pro_fut
+
+                variable = df_ext_var["Neto_normalizado"].sum()
+                
+                df_junto = pd.concat([df_ext_var, df_sum], ignore_index=True)
+
+                coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
+                
+                gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+
+                ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
+                intereses = df_junto[df_junto["Clasificacion_A"] == "GASTOS FINANCIEROS"]["Neto_A"].sum() - df_junto[df_junto["Categoria_A"].isin(ingreso_fin_cue)]["Neto_A"].sum()
+
+                proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro)
+
+            else:
+                st.warning("No hay suficientes meses anteriores para calcular el promedio de 3 meses.")
+    
     
     
     elif selected == "LY":
