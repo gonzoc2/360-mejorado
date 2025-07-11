@@ -1194,7 +1194,6 @@ if not st.session_state["logged_in"]:
             else:
                 st.error("Usuario o contraseña incorrectos")
 else:
-    st.write(st.session_state)
     df_2025 = cargar_datos(base_2025)
     df_2025 = (
     df_2025
