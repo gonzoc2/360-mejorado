@@ -2573,7 +2573,7 @@ else:
             df_varia = df_varia[df_varia["Categoria_A"].isin(costos_variables)]
             df_corregido = pd.concat([df_sum, df_varia], ignore_index=True)
             
-            estdo_re(df_corregido, ceco "5")
+            estdo_re(df_corregido, ceco = "5")
     
         elif promedio_fijo == "TRES MESES":
 
