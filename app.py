@@ -67,7 +67,8 @@ def validar_credenciales(df, username, password):
     if not usuario_row.empty:
         fila = usuario_row.iloc[0]
         proyectos = [p.strip() for p in str(fila["proyectos"]).split(",")]
-        return fila["usuario"], fila["rol"], proyectos
+        cecos = [c.strip() for c in str(fila["cecos"]).split(",")]
+        return fila["usuario"], fila["rol"], proyectos, cecos
     return None, None, None
 
 def filtro_pro(col):
@@ -376,9 +377,9 @@ def estado_resultado(df_2025, meses_seleccionado, proyecto_nombre, proyecto_codi
         'por_ebt': por_ebt
     })
 
-    return estado_resultado
+    return sultado
 
-def descargar_excel(df, nombre_archivo="estado_resultado.xlsx"):
+def descargar_excel(df, nombre_archivo="sultado.xlsx"):
     # Crear un buffer en memoria
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -394,7 +395,7 @@ def descargar_excel(df, nombre_archivo="estado_resultado.xlsx"):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-def tabla_expandible(df, cat, mes, pro, proyecto_nombre, key_prefix):
+def tabla_expandible(df, cat, mes, pro, proyecto_nombre, key_prefix, ceco):
     ingreso_total = estado_resultado(df, mes, proyecto_nombre, pro, list_pro).get("ingreso_proyecto", None)
     columnas = ['Cuenta_Nombre_A', 'Categoria_A']
 
@@ -449,7 +450,7 @@ def tabla_expandible(df, cat, mes, pro, proyecto_nombre, key_prefix):
         enable_enterprise_modules=True,
         height=400,
         theme="streamlit",
-        key=f"{key_prefix}_aggrid_{cat}_{pro}_{mes}"
+        key=f"{key_prefix}_aggrid_{cat}_{pro}_{mes}_{ceco}"
     )
 
     # Exportar a Excel
@@ -466,6 +467,7 @@ def tabla_expandible(df, cat, mes, pro, proyecto_nombre, key_prefix):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key=f"{key_prefix}_download_{cat}"
     )
+
 
 def tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_seleccionado, clasificacion, categoria, titulo):
     st.write(titulo)
@@ -610,18 +612,16 @@ def tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_selecc
 
     st.plotly_chart(fig_var, use_container_width=True)
 
-def estdo_re(df_2025):
+def estdo_re(df_2025, ceco):
     col1, col2 = st.columns(2)
     meses_seleccionado = filtro_meses(col1, df_2025)
-    
     proyecto_codigo, proyecto_nombre = filtro_pro(col2)
-
     if not meses_seleccionado:
-        st.error("Favor de seleccionar por lo menos un mes")
+            st.error("Favor de seleccionar por lo menos un mes")
     else:
-
+        
         er = estado_resultado(df_2025, meses_seleccionado, proyecto_nombre, proyecto_codigo, list_pro)
-    
+
         if st.session_state['rol'] == "gerente":
                         metricas_seleccionadas = [
                 ("Ingreso", "ingreso_proyecto"),
@@ -648,9 +648,9 @@ def estdo_re(df_2025):
                 ("Ingreso Fin", "ingreso_fin_pro"),
                 ("EBT", "ebt"),
             ]
-    
+
         valor_ingreso = er.get("ingreso_proyecto", None)
-    
+
         df_data = []
         for nombre_metrica, clave in metricas_seleccionadas:
             valor = er.get(clave, None)
@@ -662,16 +662,16 @@ def estdo_re(df_2025):
                 "% sobre Ingreso": 1.0 if clave == "ingreso_proyecto" else porcentaje_sobre_ingreso
             }
             df_data.append(fila)
-    
+
         df_tabla = pd.DataFrame(df_data)
-    
+
         # Paso 1: Formatear columnas
         df_tabla["Valor"] = df_tabla["Valor"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) and isinstance(x, (int, float, float)) else x)
         df_tabla["% sobre Ingreso"] = df_tabla["% sobre Ingreso"].apply(lambda x: f"{x:.2%}" if pd.notnull(x) and isinstance(x, (int, float)) else x)
-    
+
         # Paso 2: Definir identificador único
         i = 1  # puedes cambiarlo si tienes más tablas en la misma vista
-    
+
         # Paso 3: Estilo CSS personalizado
         st.markdown(f"""
             <style>
@@ -696,7 +696,7 @@ def estdo_re(df_2025):
             .tab-table-{i} tr:nth-child(5), 
             .tab-table-{i} tr:nth-child(7),
             .tab-table-{i} tr:nth-child(9),
-    
+
             .tab-table-{i} tr:nth-child(12) {{
                 background-color: #003366;
                 color: white;
@@ -719,28 +719,28 @@ def estdo_re(df_2025):
             }}
             </style>
         """, unsafe_allow_html=True)
-    
+
         # Paso 4: Convertir a HTML y mostrar
         html_table = df_tabla.to_html(index=False, escape=False, classes=f"tab-table-{i}")
         st.markdown(html_table, unsafe_allow_html=True)
-    
+
         descargar_excel(df_tabla, nombre_archivo="estado_resultado.xlsx")
-    
-    
-    
+
+
+
         ventanas = ['INGRESO', 'COSS', 'G.ADMN', 'GASTOS FINANCIEROS', 'INGRESO FINANCIERO']
         tabs = st.tabs(ventanas)
         with tabs[0]:
-            tabla_expandible(df_2025, "INGRESO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ingresos")
+            tabla_expandible(df_2025, "INGRESO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ingresos", ceco)
         with tabs[1]:
-            tabla_expandible(df_2025, "COSS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_coss")
+            tabla_expandible(df_2025, "COSS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_coss", ceco)
         with tabs[2]:
-            tabla_expandible(df_2025, "G.ADMN", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_g.admn")
+            tabla_expandible(df_2025, "G.ADMN", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_g.admn", ceco)
         with tabs[3]:
-            tabla_expandible(df_2025, "GASTOS FINANCIEROS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_gfin")
+            tabla_expandible(df_2025, "GASTOS FINANCIEROS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_gfin", ceco)
         with tabs[4]:
-            tabla_expandible(df_2025, "INGRESO FINANCIERO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ifin")
-    
+            tabla_expandible(df_2025, "INGRESO FINANCIERO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ifin", ceco)
+
         # ====== GRAFICOS ======
         df_numerico = pd.DataFrame([
             {
@@ -750,7 +750,7 @@ def estdo_re(df_2025):
             }
             for nombre_metrica, clave in metricas_seleccionadas
         ])
-    
+
         # Gráfico de barras horizontal
         fig_bar = px.bar(
             df_numerico,
@@ -763,7 +763,7 @@ def estdo_re(df_2025):
         )
         fig_bar.update_traces(marker_color="#00509E", textposition='outside')
         st.plotly_chart(fig_bar, use_container_width=True)
-    
+
         # Gráfico de cascada (solo para usuarios no-gerentes)
         if st.session_state['rol'] != "gerente":
             conceptos = []
@@ -773,7 +773,7 @@ def estdo_re(df_2025):
                 if nombre and er.get(clave) is not None:
                     conceptos.append(nombre[0])
                     valores.append(er[clave])
-    
+
             fig_waterfall = go.Figure(go.Waterfall(
                 name="Estado de Resultado",
                 orientation="v",
@@ -1182,12 +1182,13 @@ if not st.session_state["logged_in"]:
         submitted = st.form_submit_button("Iniciar sesión")
 
         if submitted:
-            user, rol, proyectos = validar_credenciales(df_usuarios, username, password)
+            user, rol, proyectos, cecos = validar_credenciales(df_usuarios, username, password)
             if user:
                 st.session_state["logged_in"] = True
                 st.session_state["username"] = user
                 st.session_state["rol"] = rol
                 st.session_state["proyectos"] = proyectos
+                st.session_state["cecos"] = cecos
                 st.success("¡Inicio de sesión exitoso!")
                 st.rerun()
             else:
@@ -1294,22 +1295,29 @@ else:
     if st.session_state["rol"] in ["director", "admin"] and "ESGARI" in st.session_state["proyectos"]:
         selected = option_menu(
         menu_title=None,
-        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido"],
-        icons=["house", "clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar"],
+        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo"],
+        icons=["house", "clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar","graph-up" ],
         default_index=0,
         orientation="horizontal",)
     elif st.session_state["rol"] == "director" or st.session_state["rol"] == "admin":
         selected = option_menu(
         menu_title=None,
-        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido"],
-        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar"],
+        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo"],
+        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar", "graph-up"],
         default_index=0,
         orientation="horizontal",)
     elif st.session_state["rol"] == "gerente":
         selected = option_menu(
         menu_title=None,
-        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido"],
-        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel"],
+        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo"],
+        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "graph-up"],
+        default_index=0,
+        orientation="horizontal",)
+    elif st.session_state["rol"] == "ceco":
+        selected = option_menu(
+        menu_title=None,
+        options=[ "CeCo"],
+        icons=["graph-up"],
         default_index=0,
         orientation="horizontal",)
 
@@ -1571,7 +1579,7 @@ else:
 
     elif selected == "Estado de Resultado":
 
-        estdo_re(df_2025)
+        estdo_re(df_2025, ceco = "1")
 
 
     elif selected == "Comparativa":
@@ -2077,12 +2085,12 @@ else:
     
     elif selected == "LY":
         st.write("Bienvenido a la sección de LY. Aquí puedes ver los datos del año anterior.")
-        estdo_re(df_ly)
+        estdo_re(df_ly, ceco = "2")
 
 
     elif selected == "PPT":
         st.write("Bienvenido a la sección de PPT. Aquí puedes ver el presupuesto!")
-        estdo_re(df_ppt)
+        estdo_re(df_ppt, ceco = "3")
     
     
     elif selected == "Meses":
@@ -2543,7 +2551,7 @@ else:
             df_varia = df_varia[df_varia["Categoria_A"].isin(costos_variables)]
             df_corregido = pd.concat([df_ext, df_varia], ignore_index=True)
             
-            estdo_re(df_corregido)
+            estdo_re(df_corregido, ceco = "4")
             
         elif promedio_fijo == "YTD":
 
@@ -2565,7 +2573,7 @@ else:
             df_varia = df_varia[df_varia["Categoria_A"].isin(costos_variables)]
             df_corregido = pd.concat([df_sum, df_varia], ignore_index=True)
             
-            estdo_re(df_corregido)
+            estdo_re(df_corregido, ceco "5")
     
         elif promedio_fijo == "TRES MESES":
 
@@ -2599,13 +2607,43 @@ else:
 
                 # Combinamos fijos simulados y variables reales
                 df_corregido = pd.concat([df_sum, df_varia], ignore_index=True)
-                estdo_re(df_corregido)
+                estdo_re(df_corregido, ceco = "6")
             else:
                 st.warning("No hay suficientes meses anteriores para calcular el promedio de 3 meses.")
 
+    elif selected == "CeCo":
+        texto_centrado("P&L POR CECOS")
+        ceco = 'https://docs.google.com/spreadsheets/d/1erAeeqsJKz9e9JFCJFGtGqSMLaF9s3dPEMqiteXhCD0/export?format=xlsx'
+        cecos = cargar_datos(ceco)
+        def filtro_ceco(col):
+            df_visibles = cecos[cecos["ceco"].isin(st.session_state["cecos"])]
+            
+            # Mapea nombres a códigos (solo los que tiene acceso)
+            nombre_a_codigo = dict(zip(df_visibles["nombre"], df_visibles["ceco"]))
 
+            # Caso especial: si solo tiene acceso a "ESGARI"
+            if st.session_state["cecos"] == ["ESGARI"]:
+                opciones = ["ESGARI"] + cecos["nombre"].tolist()
+                ceco_nombre = col.selectbox("Selecciona un ceco", opciones)
 
+                if ceco_nombre == "ESGARI":
+                    ceco_codigo = cecos["ceco"].tolist()  # Accede a todos
 
+                else:
+                    # Buscar código del nombre elegido
+                    ceco_codigo = cecos[cecos["nombre"] == ceco_nombre]["ceco"].values.tolist()
+            else:
+                # Normal: mostrar solo nombres permitidos
+                ceco_nombre = col.selectbox("Selecciona un ceco", list(nombre_a_codigo.keys()))
+                ceco_codigo = [nombre_a_codigo[ceco_nombre]]
+
+            return ceco_codigo, ceco_nombre
+
+        ceco_codigo, ceco_nombre = filtro_ceco(st)
+
+        df_cecos = df_2025[df_2025["CeCo_A"].isin(ceco_codigo)]
+        
+        estdo_re(df_cecos, ceco_codigo)
 
 
     
