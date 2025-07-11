@@ -377,9 +377,9 @@ def estado_resultado(df_2025, meses_seleccionado, proyecto_nombre, proyecto_codi
         'por_ebt': por_ebt
     })
 
-    return sultado
+    return estado_resultado
 
-def descargar_excel(df, nombre_archivo="sultado.xlsx"):
+def descargar_excel(df, nombre_archivo="estado_resultado.xlsx"):
     # Crear un buffer en memoria
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
