@@ -2612,6 +2612,7 @@ else:
                 st.warning("No hay suficientes meses anteriores para calcular el promedio de 3 meses.")
 
     elif selected == "CeCo":
+        import altair as alt
         texto_centrado("GASTOS POR CECO")
         ceco = 'https://docs.google.com/spreadsheets/d/1erAeeqsJKz9e9JFCJFGtGqSMLaF9s3dPEMqiteXhCD0/export?format=xlsx'
         cecos = cargar_datos(ceco)
@@ -2651,201 +2652,144 @@ else:
         df_cecos_ppt["CeCo_A"] = df_cecos_ppt["CeCo_A"].astype(str)
         df_cecos_ppt = df_cecos_ppt[df_cecos_ppt["CeCo_A"].isin(ceco_codigo)]
 
-        def tabla_expandible_comp(df,df_ly,df_ppt, cat, mes, ceco, key_prefix):
-                columnas = ['Cuenta_Nombre_A', 'Categoria_A']
-                ingreso_fin = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
-                if cat == 'INGRESO':
-                    df_tabla = df[df['Categoria_A'] == cat]
+        def tabla_expandible_comp(df, df_ly, df_ppt, cat, mes, ceco, key_prefix):
+            columnas = ['Cuenta_Nombre_A', 'Categoria_A']
+            ingreso_fin = [
+                'INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 
+                'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE'
+            ]
+            # Filtrar según categoría
+            if cat == 'INGRESO':
+                df_tab = df[df['Categoria_A'] == cat]
+                df_tab_ly = df_ly[df_ly['Categoria_A'] == cat]
+                df_tab_ppt = df_ppt[df_ppt['Categoria_A'] == cat]
+            elif cat == 'INGRESO FINANCIERO':
+                df_tab = df[df['Categoria_A'].isin(ingreso_fin)]
+                df_tab_ly = df_ly[df_ly['Categoria_A'].isin(ingreso_fin)]
+                df_tab_ppt = df_ppt[df_ppt['Categoria_A'].isin(ingreso_fin)]
+            else:
+                df_tab = df[df['Clasificacion_A'] == cat]
+                df_tab_ly = df_ly[df_ly['Clasificacion_A'] == cat]
+                df_tab_ppt = df_ppt[df_ppt['Clasificacion_A'] == cat]
 
-                    df_tabla = df_tabla[df_tabla['Mes_A'].isin(mes)]
-                    df_tabla = df_tabla.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+            df_tab = df_tab[df_tab['Mes_A'].isin(mes)].groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+            df_tab_ly = df_tab_ly[df_tab_ly['Mes_A'].isin(mes)].groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+            df_tab_ppt = df_tab_ppt[df_tab_ppt['Mes_A'].isin(mes)].groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
 
-                    df_tabla_ly = df_ly[df_ly['Categoria_A'] == cat]
+            df_comb = pd.merge(df_tab, df_tab_ly, on=columnas, how='outer', suffixes=('','_ly'))
+            df_comb = pd.merge(df_comb, df_tab_ppt, on=columnas, how='outer', suffixes=('','_ppt'))
 
-                    df_tabla_ly = df_tabla_ly[df_tabla_ly['Mes_A'].isin(mes)]
-                    df_tabla_ly = df_tabla_ly.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+            df_comb['YTD'] = df_comb['Neto_A'].fillna(0)
+            df_comb['LY'] = df_comb['Neto_A_ly'].fillna(0)
+            df_comb['PPT'] = df_comb['Neto_A_ppt'].fillna(0)
 
-                    df_tabla_ppt = df_ppt[df_ppt['Categoria_A'] == cat]
+            df_comb["Alcance_LY"] = df_comb.apply(lambda r: (r["YTD"]/r["LY"]*100-100) if r["LY"] else 0, axis=1)
+            df_comb["Alcance_PPT"] = df_comb.apply(lambda r: (r["YTD"]/r["PPT"]*100-100) if r["PPT"] else 0, axis=1)
 
-                    df_tabla_ppt = df_tabla_ppt[df_tabla_ppt['Mes_A'].isin(mes)]
-                    df_tabla_ppt = df_tabla_ppt.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
-                
-                elif cat == 'INGRESO FINANCIERO':
-                    df_tabla = df[df['Categoria_A'].isin(ingreso_fin)]
+            df_comb_or = df_comb.fillna("").reset_index(drop=True)
 
-                    df_tabla = df_tabla[df_tabla['Mes_A'].isin(mes)]
-                    df_tabla = df_tabla.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+            # AgGrid con formato USD
+            js_fmt = JsCode("""
+            function(params) {
+                if (isNaN(params.value)) return '';
+                return params.value.toLocaleString('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2
+                });
+            }
+            """)
+            df_comb_or = df_comb_or.drop(columns=["Neto_A", "Neto_A_ly", "Neto_A_ppt"], errors='ignore')
+            gb = GridOptionsBuilder.from_dataframe(df_comb_or)
+            gb.configure_default_column(groupable=True)
+            gb.configure_column("Categoria_A", rowGroup=True, hide=True)
+            for c in ["YTD", "LY", "PPT"]:
+                gb.configure_column(c, type=["numericColumn"], aggFunc="last", valueFormatter=js_fmt)
+            gb.configure_column("Alcance_LY", aggFunc="last", valueFormatter="`${value.toFixed(2)}%`")
+            gb.configure_column("Alcance_PPT", aggFunc="last", valueFormatter="`${value.toFixed(2)}%`")
+            # Calcular fila total por categoria (sin Cuenta_Nombre_A)
+            total_cat = df_comb.groupby("Categoria_A", as_index=False).agg({
+                "YTD": "sum",
+                "LY": "sum",
+                "PPT": "sum"
+            })
+            total_cat["Cuenta_Nombre_A"] = ""  # vacío para que suba al final
+            total_cat["Alcance_LY"] = total_cat.apply(
+                lambda r: (r["YTD"] / r["LY"] * 100 - 100) if r["LY"] else 0, axis=1
+            )
+            total_cat["Alcance_PPT"] = total_cat.apply(
+                lambda r: (r["YTD"] / r["PPT"] * 100 - 100) if r["PPT"] else 0, axis=1
+            )
 
-                    df_tabla_ly = df_ly[df_ly['Categoria_A'].isin(ingreso_fin)]
+            # Unir al dataframe original
+            df_comb_or = pd.concat([df_comb_or, total_cat], ignore_index=True, sort=False)
+            AgGrid(df_comb_or, gridOptions=gb.build(), enable_enterprise_modules=True,
+                allow_unsafe_jscode=True, theme="streamlit", height=400,
+                key=f"{key_prefix}_{cat}_{ceco}_{mes}")
 
-                    df_tabla_ly = df_tabla_ly[df_tabla_ly['Mes_A'].isin(mes)]
-                    df_tabla_ly = df_tabla_ly.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+            df_sin_total = df_comb_or[df_comb_or["Cuenta_Nombre_A"] != ""]
 
-                    df_tabla_ppt = df_ppt[df_ppt['Categoria_A'].isin(ingreso_fin)]
+            resumen = {
+                "cat": cat,
+                "YTD": df_sin_total["YTD"].sum(),
+                "LY": df_sin_total["LY"].sum(),
+                "PPT": df_sin_total["PPT"].sum()
+            }
+            
+            df_chart = pd.DataFrame([{"Tipo": t, "Valor": resumen[t]} for t in ["YTD","LY","PPT"]])
+            st.altair_chart(
+                alt.Chart(df_chart).mark_bar().encode(x="Tipo", y="Valor", color="Tipo")
+                                .properties(title=f"{cat}: Totales"),
+                use_container_width=True
+            )
+            return resumen
 
-                    df_tabla_ppt = df_tabla_ppt[df_tabla_ppt['Mes_A'].isin(mes)]
-                    df_tabla_ppt = df_tabla_ppt.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
-                    
-                else:
-                    df_tabla = df[df['Clasificacion_A'] == cat]
-
-                    df_tabla = df_tabla[df_tabla['Mes_A'].isin(mes)]
-                    df_tabla = df_tabla.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
-
-                    df_tabla_ly = df_ly[df_ly['Clasificacion_A'] == cat]
-
-                    df_tabla_ly = df_tabla_ly[df_tabla_ly['Mes_A'].isin(mes)]
-                    df_tabla_ly = df_tabla_ly.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
-
-                    df_tabla_ppt = df_ppt[df_ppt['Clasificacion_A'] == cat]
-
-                    df_tabla_ppt = df_tabla_ppt[df_tabla_ppt['Mes_A'].isin(mes)]
-                    df_tabla_ppt = df_tabla_ppt.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
-                
-
-
-                # Paso 1: Realizamos las uniones de las tablas
-                df_combinado = pd.merge(df_tabla, df_tabla_ly, on=['Cuenta_Nombre_A', 'Categoria_A'], how='outer', suffixes=('', '_ly'))
-                df_combinado = pd.merge(df_combinado, df_tabla_ppt, on=['Cuenta_Nombre_A', 'Categoria_A'], how='outer', suffixes=('', '_ppt'))
-
-                # Paso 2: Llenamos las columnas faltantes con ceros
-                df_combinado['YTD'] = df_combinado['Neto_A'].fillna(0)
-                df_combinado['LY'] = df_combinado['Neto_A_ly'].fillna(0)
-                df_combinado['PPT'] = df_combinado['Neto_A_ppt'].fillna(0)
-
-                # Paso 3: Calculamos las nuevas columnas para Alcance_LY y Alcance_PPT
-                df_combinado['Alcance_LY'] = (df_combinado['YTD'] / df_combinado['LY']-100).replace(0, float('nan'))
-                df_combinado['Alcance_PPT'] = (df_combinado['YTD'] / df_combinado['PPT']-100).replace(0, float('nan'))
-
-                # Paso 4: Reemplazamos los valores NaN con 0 en las divisiones
-                df_combinado['Alcance_LY'] = df_combinado['Alcance_LY'].fillna(0)
-                df_combinado['Alcance_PPT'] = df_combinado['Alcance_PPT'].fillna(0)
-                df_combinado = df_combinado.loc[:, ~df_combinado.columns.str.contains('Neto')]
-                cols_alcance = df_combinado.columns[df_combinado.columns.str.contains('Alcance')]
-                df_combinado[cols_alcance] = df_combinado[cols_alcance] * 100 -100
-
-
-                # Limpiar el DataFrame (muy importante para evitar errores en AgGrid)
-                df_combinado = df_combinado.fillna("")  # Reemplazar NaN por cadenas vacías
-                df_combinado.reset_index(drop=True, inplace=True)  # Reiniciar índices
-
-                # Precalcular las columnas Alcance_LY y Alcance_PPT en el DataFrame
-                # Calcular las columnas con validación para evitar divisiones por cero
-                df_combinado["Alcance_LY"] = df_combinado.apply(
-                    lambda row: (row["YTD"] / row["LY"] * 100 -100) if row["YTD"] > 0 and row["LY"] != 0 else 0, axis=1
-                )
-                df_combinado["Alcance_PPT"] = df_combinado.apply(
-                    lambda row: (row["YTD"] / row["PPT"] * 100- 100) if row["YTD"] > 0 and row["PPT"] != 0 else 0, axis=1
-                )
-
-                # Crear valores precalculados para las filas agrupadas
-                df_grouped = df_combinado.groupby("Categoria_A", as_index=False).agg({
-                    "YTD": "sum",
-                    "LY": "sum",
-                    "PPT": "sum"
-                })
-
-                # Calcular las columnas en el DataFrame agrupado con validación para evitar divisiones por cero
-                df_grouped["Alcance_LY"] = df_grouped.apply(
-                    lambda row: (row["YTD"] / row["LY"] * 100 - 100) if row["YTD"] > 0 and row["LY"] != 0 else 0, axis=1
-                )
-                df_grouped["Alcance_LY"] = np.where(df_grouped["LY"] > 0, (df_grouped["YTD"] / df_grouped["LY"] * 100) - 100, 0)
-                df_grouped["Alcance_PPT"] = np.where(df_grouped["PPT"] > 0, (df_grouped["YTD"] / df_grouped["PPT"] * 100) - 100, 0)
-
-                # Combinar los datos originales con los valores agrupados
-                df_combinado_or = df_combinado
-                df_combinado = pd.concat([df_combinado, df_grouped], ignore_index=True)
-                
-                # Configurar AgGrid
-                gb = GridOptionsBuilder.from_dataframe(df_combinado)
-                gb.configure_default_column(groupable=True)
-
-                # Ocultar columna pero hacerla agrupable
-                gb.configure_column("Categoria_A", rowGroup=True, hide=True)
-
-                # Configurar columnas principales
-                js_code_value_formatter_currency = JsCode("""
-                    function(params) {
-                        if (params.value === null || params.value === undefined) return '';
-                        return params.value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-                    }
-                    """)
-
-                gb.configure_column(
-                    "YTD",
-                    aggFunc="last",  # Suma para filas agrupadas
-                    valueFormatter=js_code_value_formatter_currency,
-                )
-
-                gb.configure_column(
-                    "LY",
-                    aggFunc="last",  # Suma para filas agrupadas
-                    valueFormatter=js_code_value_formatter_currency,
-                )
-
-                gb.configure_column(
-                    "PPT",
-                    aggFunc="last",  # Suma para filas agrupadas
-                    valueFormatter=js_code_value_formatter_currency,
-                )
-
-                # Mostrar valores precalculados en Alcance_LY y Alcance_PPT
-                gb.configure_column(
-                    "Alcance_LY",
-                    aggFunc="last",  # Usar el último valor precalculado
-                    valueFormatter="`${value.toFixed(2)}%`",
-                )
-
-                gb.configure_column(
-                    "Alcance_PPT",
-                    aggFunc="last",  # Usar el último valor precalculado
-                    valueFormatter="`${value.toFixed(2)}%`",
-                )
-
-                # Construir las opciones de la tabla
-                grid_options = gb.build()
-                    # Mostrar la tabla dentro de un expander
-                    
-                AgGrid(
-                            df_combinado,  # El DataFrame que estás usando
-                            gridOptions=grid_options,  # Opciones de la tabla
-                            enable_enterprise_modules=True,  # Módulos avanzados de AgGrid
-                            allow_unsafe_jscode=True,  # Permite usar JsCode personalizado
-                            height=400,  # Altura de la tabla
-                            theme="streamlit",  # Tema de la tabla
-                            key=f"{key_prefix}_aggrid_{cat}_{mes}_{ceco}"  # Llave única para evitar conflictos
-                        )
-
-                        # Convertir el DataFrame a un archivo Excel en memoria
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                            df_combinado_or.to_excel(writer, index=False, sheet_name=f"Tabla_{cat}")
-                            output.seek(0)  # Regresar el puntero al inicio del flujo de datos
-
-                        # Agregar el botón de descarga para Excel con un unique key
-                st.download_button(
-                            label=f"Descargar tabla {cat}",
-                            data=output,
-                            file_name=f"tabla_{cat}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"{key_prefix}_download_{cat}"  # Unique key for download button
-                        )
-
-        #estdo_re(df_cecos, ceco_codigo)
+        # --- Selección de meses ---
         meses = filtro_meses(col2, df_cecos)
 
-        ventanas = ['INGRESO', 'COSS', 'G.ADMN', 'GASTOS FINANCIEROS', 'INGRESO FINANCIERO']
+        # --- Pestañas ---
+        resumenes = {}
+        ventanas = ['INGRESO','COSS','G.ADMN','GASTOS FINANCIEROS','INGRESO FINANCIERO']
         tabs = st.tabs(ventanas)
-        with tabs[0]:
-            tabla_expandible_comp(df_cecos,df_cecos_ly,df_cecos_ppt, 'INGRESO', meses, ceco_codigo, 'INGRESO')
-        with tabs[1]:
-            tabla_expandible_comp(df_cecos,df_cecos_ly,df_cecos_ppt, 'COSS', meses, ceco_codigo, 'COSS')
-        with tabs[2]:
-            tabla_expandible_comp(df_cecos,df_cecos_ly,df_cecos_ppt, 'G.ADMN', meses, ceco_codigo, 'G.ADMN')
-        with tabs[3]:
-            tabla_expandible_comp(df_cecos,df_cecos_ly,df_cecos_ppt, 'GASTOS FINANCIEROS', meses, ceco_codigo, 'GASTOS FINANCIEROS')
-        with tabs[4]:
-            tabla_expandible_comp(df_cecos,df_cecos_ly,df_cecos_ppt, 'INGRESO FINANCIERO', meses, ceco_codigo, 'INGRESO FINANCIERO')
+        for i, cat in enumerate(ventanas):
+            with tabs[i]:
+                resumenes[cat] = tabla_expandible_comp(df_cecos, df_cecos_ly, df_cecos_ppt, cat, meses, ceco_codigo, cat)
+
+        # --- Resumen global ---
+        ing = resumenes["INGRESO"]
+        diff_ing = ing["YTD"] - ing["LY"]
+        otros = ['COSS','G.ADMN','GASTOS FINANCIEROS','INGRESO FINANCIERO']
+        ytd_otros = sum(resumenes[c]["YTD"] for c in otros)
+        ly_otros = sum(resumenes[c]["LY"] for c in otros)
+        diff_otros = ytd_otros - ly_otros
+        diff_ing_ppt = ing["YTD"] - ing["PPT"]
+        ppt_otros = ytd_otros - sum(resumenes[c]["PPT"] for c in otros)
+
+
+        st.subheader("📌 Totales Globales")
+        c1, c2 = st.columns(2)
+        c1.metric("💰 INGRESO (YTD−LY)", f"${diff_ing:,.2f}",
+                delta=f"{(diff_ing/ing['LY']*100) if ing['LY'] else 0:.2f}%")
+        c2.metric("📉 OTROS GASTOS (YTD−LY)", f"${diff_otros:,.2f}",
+                delta=f"{(diff_otros/ly_otros*100) if ly_otros else 0:.2f}%")
+        c1.metric("💰 INGRESO (YTD−PPT)", f"${diff_ing_ppt:,.2f}",
+                delta=f"{(diff_ing_ppt/ing['PPT']*100) if ing['PPT'] else 0:.2f}%")
+        c2.metric("📉 OTROS GASTOS (YTD−PPT)", f"${ppt_otros:,.2f}",
+                delta=f"{(ppt_otros/resumenes['COSS']['PPT']*100) if resumenes['COSS']['PPT'] else 0:.2f}%")
+
+        df_global = pd.DataFrame([
+            {"Categoria":"INGRESO","Tipo":"YTD","Valor":ing["YTD"]},
+            {"Categoria":"INGRESO","Tipo":"LY","Valor":ing["LY"]},
+            {"Categoria":"OTROS","Tipo":"YTD","Valor":ytd_otros},
+            {"Categoria":"OTROS","Tipo":"LY","Valor":ly_otros},
+            {"Categoria":"INGRESO","Tipo":"PPT","Valor":ing["PPT"]},
+            {"Categoria":"OTROS","Tipo":"PPT","Valor":ytd_otros - sum(resumenes[c]["PPT"] for c in otros)}
+        ])
+        st.altair_chart(
+            alt.Chart(df_global).mark_bar().encode(x="Categoria:N", y="Valor:Q", color="Tipo:N")
+                            .properties(title="Comparativo Global YTD vs LY"),
+            use_container_width=True
+    )
 
 
     
