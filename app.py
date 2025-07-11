@@ -2612,12 +2612,12 @@ else:
                 st.warning("No hay suficientes meses anteriores para calcular el promedio de 3 meses.")
 
     elif selected == "CeCo":
-        texto_centrado("P&L POR CECOS")
+        texto_centrado("GASTOS POR CECO")
         ceco = 'https://docs.google.com/spreadsheets/d/1erAeeqsJKz9e9JFCJFGtGqSMLaF9s3dPEMqiteXhCD0/export?format=xlsx'
         cecos = cargar_datos(ceco)
         def filtro_ceco(col):
+            cecos["ceco"] = cecos["ceco"].astype(str)
             df_visibles = cecos[cecos["ceco"].isin(st.session_state["cecos"])]
-            
             # Mapea nombres a códigos (solo los que tiene acceso)
             nombre_a_codigo = dict(zip(df_visibles["nombre"], df_visibles["ceco"]))
 
@@ -2638,12 +2638,214 @@ else:
                 ceco_codigo = [nombre_a_codigo[ceco_nombre]]
 
             return ceco_codigo, ceco_nombre
+        col1, col2 = st.columns(2)
+        ceco_codigo, ceco_nombre = filtro_ceco(col1)
 
-        ceco_codigo, ceco_nombre = filtro_ceco(st)
+        df_cecos = df_2025.copy()
+        df_cecos["CeCo_A"] = df_cecos["CeCo_A"].astype(str)
+        df_cecos = df_cecos[df_cecos["CeCo_A"].isin(ceco_codigo)]
+        df_cecos_ly = df_ly.copy()
+        df_cecos_ly["CeCo_A"] = df_cecos_ly["CeCo_A"].astype(str)
+        df_cecos_ly = df_cecos_ly[df_cecos_ly["CeCo_A"].isin(ceco_codigo)]
+        df_cecos_ppt = df_ppt.copy()
+        df_cecos_ppt["CeCo_A"] = df_cecos_ppt["CeCo_A"].astype(str)
+        df_cecos_ppt = df_cecos_ppt[df_cecos_ppt["CeCo_A"].isin(ceco_codigo)]
 
-        df_cecos = df_2025[df_2025["CeCo_A"].isin(ceco_codigo)]
-        
-        estdo_re(df_cecos, ceco_codigo)
+        def tabla_expandible_comp(df,df_ly,df_ppt, cat, mes, ceco, key_prefix):
+                columnas = ['Cuenta_Nombre_A', 'Categoria_A']
+                ingreso_fin = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
+                if cat == 'INGRESO':
+                    df_tabla = df[df['Categoria_A'] == cat]
+
+                    df_tabla = df_tabla[df_tabla['Mes_A'].isin(mes)]
+                    df_tabla = df_tabla.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+
+                    df_tabla_ly = df_ly[df_ly['Categoria_A'] == cat]
+
+                    df_tabla_ly = df_tabla_ly[df_tabla_ly['Mes_A'].isin(mes)]
+                    df_tabla_ly = df_tabla_ly.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+
+                    df_tabla_ppt = df_ppt[df_ppt['Categoria_A'] == cat]
+
+                    df_tabla_ppt = df_tabla_ppt[df_tabla_ppt['Mes_A'].isin(mes)]
+                    df_tabla_ppt = df_tabla_ppt.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+                
+                elif cat == 'INGRESO FINANCIERO':
+                    df_tabla = df[df['Categoria_A'].isin(ingreso_fin)]
+
+                    df_tabla = df_tabla[df_tabla['Mes_A'].isin(mes)]
+                    df_tabla = df_tabla.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+
+                    df_tabla_ly = df_ly[df_ly['Categoria_A'].isin(ingreso_fin)]
+
+                    df_tabla_ly = df_tabla_ly[df_tabla_ly['Mes_A'].isin(mes)]
+                    df_tabla_ly = df_tabla_ly.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+
+                    df_tabla_ppt = df_ppt[df_ppt['Categoria_A'].isin(ingreso_fin)]
+
+                    df_tabla_ppt = df_tabla_ppt[df_tabla_ppt['Mes_A'].isin(mes)]
+                    df_tabla_ppt = df_tabla_ppt.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+                    
+                else:
+                    df_tabla = df[df['Clasificacion_A'] == cat]
+
+                    df_tabla = df_tabla[df_tabla['Mes_A'].isin(mes)]
+                    df_tabla = df_tabla.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+
+                    df_tabla_ly = df_ly[df_ly['Clasificacion_A'] == cat]
+
+                    df_tabla_ly = df_tabla_ly[df_tabla_ly['Mes_A'].isin(mes)]
+                    df_tabla_ly = df_tabla_ly.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+
+                    df_tabla_ppt = df_ppt[df_ppt['Clasificacion_A'] == cat]
+
+                    df_tabla_ppt = df_tabla_ppt[df_tabla_ppt['Mes_A'].isin(mes)]
+                    df_tabla_ppt = df_tabla_ppt.groupby(columnas, as_index=False).agg({"Neto_A": "sum"})
+                
+
+
+                # Paso 1: Realizamos las uniones de las tablas
+                df_combinado = pd.merge(df_tabla, df_tabla_ly, on=['Cuenta_Nombre_A', 'Categoria_A'], how='outer', suffixes=('', '_ly'))
+                df_combinado = pd.merge(df_combinado, df_tabla_ppt, on=['Cuenta_Nombre_A', 'Categoria_A'], how='outer', suffixes=('', '_ppt'))
+
+                # Paso 2: Llenamos las columnas faltantes con ceros
+                df_combinado['YTD'] = df_combinado['Neto_A'].fillna(0)
+                df_combinado['LY'] = df_combinado['Neto_A_ly'].fillna(0)
+                df_combinado['PPT'] = df_combinado['Neto_A_ppt'].fillna(0)
+
+                # Paso 3: Calculamos las nuevas columnas para Alcance_LY y Alcance_PPT
+                df_combinado['Alcance_LY'] = (df_combinado['YTD'] / df_combinado['LY']-100).replace(0, float('nan'))
+                df_combinado['Alcance_PPT'] = (df_combinado['YTD'] / df_combinado['PPT']-100).replace(0, float('nan'))
+
+                # Paso 4: Reemplazamos los valores NaN con 0 en las divisiones
+                df_combinado['Alcance_LY'] = df_combinado['Alcance_LY'].fillna(0)
+                df_combinado['Alcance_PPT'] = df_combinado['Alcance_PPT'].fillna(0)
+                df_combinado = df_combinado.loc[:, ~df_combinado.columns.str.contains('Neto')]
+                cols_alcance = df_combinado.columns[df_combinado.columns.str.contains('Alcance')]
+                df_combinado[cols_alcance] = df_combinado[cols_alcance] * 100 -100
+
+
+                # Limpiar el DataFrame (muy importante para evitar errores en AgGrid)
+                df_combinado = df_combinado.fillna("")  # Reemplazar NaN por cadenas vacías
+                df_combinado.reset_index(drop=True, inplace=True)  # Reiniciar índices
+
+                # Precalcular las columnas Alcance_LY y Alcance_PPT en el DataFrame
+                # Calcular las columnas con validación para evitar divisiones por cero
+                df_combinado["Alcance_LY"] = df_combinado.apply(
+                    lambda row: (row["YTD"] / row["LY"] * 100 -100) if row["YTD"] > 0 and row["LY"] != 0 else 0, axis=1
+                )
+                df_combinado["Alcance_PPT"] = df_combinado.apply(
+                    lambda row: (row["YTD"] / row["PPT"] * 100- 100) if row["YTD"] > 0 and row["PPT"] != 0 else 0, axis=1
+                )
+
+                # Crear valores precalculados para las filas agrupadas
+                df_grouped = df_combinado.groupby("Categoria_A", as_index=False).agg({
+                    "YTD": "sum",
+                    "LY": "sum",
+                    "PPT": "sum"
+                })
+
+                # Calcular las columnas en el DataFrame agrupado con validación para evitar divisiones por cero
+                df_grouped["Alcance_LY"] = df_grouped.apply(
+                    lambda row: (row["YTD"] / row["LY"] * 100 - 100) if row["YTD"] > 0 and row["LY"] != 0 else 0, axis=1
+                )
+                df_grouped["Alcance_LY"] = np.where(df_grouped["LY"] > 0, (df_grouped["YTD"] / df_grouped["LY"] * 100) - 100, 0)
+                df_grouped["Alcance_PPT"] = np.where(df_grouped["PPT"] > 0, (df_grouped["YTD"] / df_grouped["PPT"] * 100) - 100, 0)
+
+                # Combinar los datos originales con los valores agrupados
+                df_combinado_or = df_combinado
+                df_combinado = pd.concat([df_combinado, df_grouped], ignore_index=True)
+                
+                # Configurar AgGrid
+                gb = GridOptionsBuilder.from_dataframe(df_combinado)
+                gb.configure_default_column(groupable=True)
+
+                # Ocultar columna pero hacerla agrupable
+                gb.configure_column("Categoria_A", rowGroup=True, hide=True)
+
+                # Configurar columnas principales
+                js_code_value_formatter_currency = JsCode("""
+                    function(params) {
+                        if (params.value === null || params.value === undefined) return '';
+                        return params.value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                    }
+                    """)
+
+                gb.configure_column(
+                    "YTD",
+                    aggFunc="last",  # Suma para filas agrupadas
+                    valueFormatter=js_code_value_formatter_currency,
+                )
+
+                gb.configure_column(
+                    "LY",
+                    aggFunc="last",  # Suma para filas agrupadas
+                    valueFormatter=js_code_value_formatter_currency,
+                )
+
+                gb.configure_column(
+                    "PPT",
+                    aggFunc="last",  # Suma para filas agrupadas
+                    valueFormatter=js_code_value_formatter_currency,
+                )
+
+                # Mostrar valores precalculados en Alcance_LY y Alcance_PPT
+                gb.configure_column(
+                    "Alcance_LY",
+                    aggFunc="last",  # Usar el último valor precalculado
+                    valueFormatter="`${value.toFixed(2)}%`",
+                )
+
+                gb.configure_column(
+                    "Alcance_PPT",
+                    aggFunc="last",  # Usar el último valor precalculado
+                    valueFormatter="`${value.toFixed(2)}%`",
+                )
+
+                # Construir las opciones de la tabla
+                grid_options = gb.build()
+                    # Mostrar la tabla dentro de un expander
+                    
+                AgGrid(
+                            df_combinado,  # El DataFrame que estás usando
+                            gridOptions=grid_options,  # Opciones de la tabla
+                            enable_enterprise_modules=True,  # Módulos avanzados de AgGrid
+                            allow_unsafe_jscode=True,  # Permite usar JsCode personalizado
+                            height=400,  # Altura de la tabla
+                            theme="streamlit",  # Tema de la tabla
+                            key=f"{key_prefix}_aggrid_{cat}_{mes}_{ceco}"  # Llave única para evitar conflictos
+                        )
+
+                        # Convertir el DataFrame a un archivo Excel en memoria
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                            df_combinado_or.to_excel(writer, index=False, sheet_name=f"Tabla_{cat}")
+                            output.seek(0)  # Regresar el puntero al inicio del flujo de datos
+
+                        # Agregar el botón de descarga para Excel con un unique key
+                st.download_button(
+                            label=f"Descargar tabla {cat}",
+                            data=output,
+                            file_name=f"tabla_{cat}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"{key_prefix}_download_{cat}"  # Unique key for download button
+                        )
+
+        #estdo_re(df_cecos, ceco_codigo)
+        meses = filtro_meses(col2, df_cecos)
+
+        ventanas = ['INGRESO', 'COSS', 'G.ADMN', 'GASTOS FINANCIEROS', 'INGRESO FINANCIERO']
+        tabs = st.tabs(ventanas)
+        with tabs[0]:
+            tabla_expandible_comp(df_cecos,df_cecos_ly,df_cecos_ppt, 'INGRESO', meses, ceco_codigo, 'INGRESO')
+        with tabs[1]:
+            tabla_expandible_comp(df_cecos,df_cecos_ly,df_cecos_ppt, 'COSS', meses, ceco_codigo, 'COSS')
+        with tabs[2]:
+            tabla_expandible_comp(df_cecos,df_cecos_ly,df_cecos_ppt, 'G.ADMN', meses, ceco_codigo, 'G.ADMN')
+        with tabs[3]:
+            tabla_expandible_comp(df_cecos,df_cecos_ly,df_cecos_ppt, 'GASTOS FINANCIEROS', meses, ceco_codigo, 'GASTOS FINANCIEROS')
+        with tabs[4]:
+            tabla_expandible_comp(df_cecos,df_cecos_ly,df_cecos_ppt, 'INGRESO FINANCIERO', meses, ceco_codigo, 'INGRESO FINANCIERO')
 
 
     
