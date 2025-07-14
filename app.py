@@ -1295,29 +1295,41 @@ else:
     if st.session_state["rol"] in ["director", "admin"] and "ESGARI" in st.session_state["proyectos"]:
         selected = option_menu(
         menu_title=None,
-        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo"],
-        icons=["house", "clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar","graph-up" ],
+        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios"],
+        icons = [
+                "house",                # Resumen
+                "clipboard-data",       # Estado de Resultado
+                "file-earmark-bar-graph",# Comparativa
+                "bar-chart",            # Análisis
+                "building",             # Proyeccion
+                "clock-history",        # LY
+                "easel",                # PPT
+                "calendar",             # Meses
+                "graph-up",             # Mes Corregido
+                "person-gear",          # CeCo -> "Centro de Costos"
+                "percent"               # Ratios
+            ],
         default_index=0,
         orientation="horizontal",)
     elif st.session_state["rol"] == "director" or st.session_state["rol"] == "admin":
         selected = option_menu(
         menu_title=None,
-        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo"],
-        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar", "graph-up"],
+        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios"],
+        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar", "graph-up", "person-gear", "percent"],
         default_index=0,
         orientation="horizontal",)
     elif st.session_state["rol"] == "gerente":
         selected = option_menu(
         menu_title=None,
-        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo"],
-        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "graph-up"],
+        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios"],
+        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "graph-up", "person-gear", "percent"],
         default_index=0,
         orientation="horizontal",)
     elif st.session_state["rol"] == "ceco":
         selected = option_menu(
         menu_title=None,
         options=[ "CeCo"],
-        icons=["graph-up"],
+        icons=["person-gear"],
         default_index=0,
         orientation="horizontal",)
 
@@ -2791,6 +2803,119 @@ else:
             use_container_width=True
     )
 
+    elif selected == "Ratios":
+        st.write("Ratios de la empresa")
+        col1, col2 = st.columns(2)
+        numerador_cat = col1.toggle("Numerador por categoría", value=True)
+        denminador_cat = col2.toggle("Denominador por categoría", value=True)
+
+        if numerador_cat:
+            df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
+            cate = df_cat["Categoria_A"].unique().tolist()
+            numera_cat = col1.selectbox("Selecciona una categoría", cate, key="cat_numerador")
+            tipo_nu = "Categoria_A"
+
+        else:
+            df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
+            cate = df_cat["Cuenta_Nombre_A"].unique().tolist()
+            numera_cat = col1.selectbox("Selecciona una categoría", cate, key="cat_numerador")
+            tipo_nu = "Cuenta_Nombre_A"
+
+        if denminador_cat:
+            df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
+            cate = df_cat["Categoria_A"].unique().tolist()
+            denomi_cat = col2.selectbox("Selecciona una categoría", cate, key="cat_denominador")
+            tipo_de = "Categoria_A"
+
+        else:
+            df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
+            cate = df_cat["Cuenta_Nombre_A"].unique().tolist()
+            denomi_cat = col2.selectbox("Selecciona una categoría", cate, key="cat_denominador")
+            tipo_de = "Cuenta_Nombre_A"
+        
+        meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+        meses_disponibles = [mes for mes in meses_ordenados if mes in df_2025["Mes_A"].unique()]
+        mes = st.multiselect("Selecciona los meses", meses_disponibles, default=meses_disponibles)
+        lista = {}
+        for x in mes:
+            df_mes = df_2025[df_2025["Mes_A"] == x]
+            numera = df_mes[df_mes[tipo_nu] == numera_cat]["Neto_A"].sum()
+            denomi = df_mes[df_mes[tipo_de] == denomi_cat]["Neto_A"].sum()
+            if denomi != 0:
+                ratio = numera / denomi
+            else:
+                ratio = 0
+            lista[x] = ratio
+        st.write(f"### Ratio de {numera_cat} sobre {denomi_cat}")
+
+        def render_ratio_table(ratio_dict):
+            tabla_html = """
+            <style>
+            table {
+                border-collapse: collapse;
+                width: 100%;
+                font-family: Arial, sans-serif;
+                margin-top: 10px;
+                background-color: white;
+                color: black;
+            }
+            th, td {
+                border: 1px solid #dddddd;
+                text-align: center;
+                padding: 8px;
+            }
+            th {
+                background-color: #003366;  /* Azul marino */
+                color: white;
+            }
+            tr:nth-child(even) {
+                background-color: #f9f9f9;
+            }
+            </style>
+            <table>
+                <tr>
+                    <th>Mes</th>
+                    <th>Ratio</th>
+                </tr>
+            """
+            for mes, valor in ratio_dict.items():
+                tabla_html += f"<tr><td>{mes}</td><td>{valor:.4f}</td></tr>"
+            tabla_html += "</table>"
+            return tabla_html
+
+        st.markdown(render_ratio_table(lista), unsafe_allow_html=True)
+
+        # Crear DataFrame ordenado
+        df_ratios = pd.DataFrame({
+            "Mes": list(lista.keys()),
+            "Ratio": list(lista.values())
+        })
+
+        # Ordenar por los meses esperados
+        df_ratios["Mes"] = pd.Categorical(df_ratios["Mes"], categories=meses_ordenados, ordered=True)
+        df_ratios = df_ratios.sort_values("Mes")
+
+        # Crear gráfico con etiquetas
+        fig = px.line(
+            df_ratios, 
+            x="Mes", 
+            y="Ratio", 
+            title=f"Ratio: {numera_cat} / {denomi_cat}",
+            markers=True,
+            text=df_ratios["Ratio"].apply(lambda x: f"{x:.2}")  # Etiquetas en porcentaje
+        )
+
+        fig.update_traces(textposition="top center", line_color="#003366")
+        fig.update_layout(
+            title_font_size=20,
+            title_font_color="White",
+            xaxis_title="Mes",
+            yaxis_title="Ratio",
+            #yaxis=dict(tickformat=".0%"),
+            font=dict(color="white")
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
 
     
     
