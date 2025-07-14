@@ -2846,25 +2846,25 @@ else:
         if numerador_cat:
             df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
             cate = df_cat["Categoria_A"].unique().tolist()
-            numera_cat = col1.selectbox("Selecciona una categoría", cate, key="cat_numerador")
+            numera_cat = col1.selectbox(f"Selecciona una Categoría", cate, key="cat_numerador")
             tipo_nu = "Categoria_A"
 
         else:
             df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
             cate = df_cat["Cuenta_Nombre_A"].unique().tolist()
-            numera_cat = col1.selectbox("Selecciona una categoría", cate, key="cat_numerador")
+            numera_cat = col1.selectbox("Selecciona una Cuenta", cate, key="cat_numerador")
             tipo_nu = "Cuenta_Nombre_A"
 
         if denminador_cat:
             df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
             cate = df_cat["Categoria_A"].unique().tolist()
-            denomi_cat = col2.selectbox("Selecciona una categoría", cate, key="cat_denominador")
+            denomi_cat = col2.selectbox("Selecciona una Categoría", cate, key="cat_denominador")
             tipo_de = "Categoria_A"
 
         else:
             df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
             cate = df_cat["Cuenta_Nombre_A"].unique().tolist()
-            denomi_cat = col2.selectbox("Selecciona una categoría", cate, key="cat_denominador")
+            denomi_cat = col2.selectbox("Selecciona una Cuenta", cate, key="cat_denominador")
             tipo_de = "Cuenta_Nombre_A"
         
         meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
