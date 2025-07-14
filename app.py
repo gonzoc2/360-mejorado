@@ -1108,7 +1108,7 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
 
     # 🧩 Tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Proyeccion Lineal",
+        "Proyeccion",
         "Utilidad  Minima Esperada (Punto de Equilibrio)",
         "Ingreso Manual",
         "Utilidad esperada",
