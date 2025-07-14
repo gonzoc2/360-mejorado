@@ -2856,7 +2856,7 @@ else:
             else:
                 ratio = 0
             lista[x] = ratio
-        st.write(f"### Ratio de {numera_cat} sobre {denomi_cat}")
+        st.write(f"Ratio de {numera_cat} sobre {denomi_cat}")
 
         def render_ratio_table(ratio_dict):
             tabla_html = """
