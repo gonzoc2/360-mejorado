@@ -1888,8 +1888,7 @@ else:
         col1, col2 = st.columns(2)
         promedio_fijo = col1.selectbox("Seleciona que promedio usar para los gastos fijos", ["LM", "YTD", "TRES MESES"])
         promedio_variables = col2.selectbox("Seleciona que promedio usar para los gastos variables", ["Mes actual","LM", "YTD", "TRES MESES"])
-        meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
-                "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+        meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
         meses_disponibles = [mes for mes in meses_ordenados if mes in df_2025["Mes_A"].unique()]
         mes_ant = meses_disponibles[-2] if meses_disponibles else None
         mes_act = meses_disponibles[-1] if meses_disponibles else None
@@ -1899,7 +1898,45 @@ else:
         fecha_act = fecha_actualizacion['fecha'].iloc[0].day
         fecha_completa = fecha_actualizacion['fecha'].iloc[0]
         ultimo_dia_mes = (fecha_completa + pd.offsets.MonthEnd(0)).day
+        ingreso_lineal = st.toggle("ingreso lineal / ingreso por historico", value=True)
+        if ingreso_lineal:
+            st.write("Proyección lineal")
+            df_ing_futu = df_2025[df_2025["Mes_A"] == mes_act]
+            df_ing_futu = df_ing_futu[df_ing_futu["Proyecto_A"].isin(codigo_pro)]
+            df_ing_futu = df_ing_futu[df_ing_futu["Categoria_A"] == "INGRESO"]
+            ingreso_pro_fut = df_ing_futu["Neto_A"].sum() / fecha_act * ultimo_dia_mes
+        else:
+            st.write("Proyección con historicos")
+            ingreso_sem = "https://docs.google.com/spreadsheets/d/14l6QLudSBpqxmfuwRqVxCXzhSFzRL0AqWJqVuIOaFFQ/export?format=xlsx"
+            df = cargar_datos(ingreso_sem)
+            df["mes"] = pd.to_datetime(df["fecha"]).dt.day
+            indice_mas_cercano = (df['mes'] - fecha_act).abs().idxmin()
+            valor_mas_cercano = df.loc[indice_mas_cercano, 'mes']
 
+            df_va = df[df['mes'] == valor_mas_cercano]
+            df_va["ingreso"] = df_va["ingreso"] / valor_mas_cercano * fecha_act
+            df_va = df_va.drop(columns=["mes", "semana", "fecha"])
+            df_fin = df[df["semana"] == 4]
+            df_fin = df_fin.drop(columns=["mes", "semana", "fecha"])
+
+            # Hacer merge por la columna 'proyecto'
+            df_merged = pd.merge(df_va, df_fin, on="proyecto", suffixes=("_va", "_fin"))
+
+            # Crear columna con la división de ingresos
+            df_merged["ingreso_dividido"] = df_merged["ingreso_va"] / df_merged["ingreso_fin"]
+
+            df_proyeccion = df_2025[df_2025["Mes_A"] == mes_act]
+            df_proyeccion = df_proyeccion.groupby([
+                    "Proyecto_A", "Categoria_A"
+                ], as_index=False)["Neto_A"].sum()
+            df_proyeccion = df_proyeccion[df_proyeccion["Categoria_A"] == "INGRESO"]
+            df_proyeccion = df_proyeccion.drop(columns=["Categoria_A"])
+            df_proyeccion["Proyecto_A"] = df_proyeccion["Proyecto_A"].astype(float)
+            df_proyeccion = pd.merge(df_proyeccion, df_merged, left_on="Proyecto_A", right_on="proyecto", how="left")
+            df_proyeccion["Neto_A"] = df_proyeccion["Neto_A"] / df_proyeccion["ingreso_dividido"]
+            df_proyeccion = df_proyeccion.drop(columns=["proyecto", "ingreso_va", "ingreso_fin", "ingreso_dividido"])
+            df_proyeccion["Proyecto_A"] = df_proyeccion["Proyecto_A"].astype(float).astype(int).astype(str)
+            ingreso_pro_fut = df_proyeccion[df_proyeccion["Proyecto_A"].isin(codigo_pro)]["Neto_A"].sum()
 
         if promedio_fijo == "LM":
             
@@ -1976,7 +2013,6 @@ else:
             df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
             df_ext_var = df_ext_var[~df_ext_var["Categoria_A"].isin(["INGRESO"])]
              
-            ingreso_pro_fut = ingreso_pro / fecha_act  * ultimo_dia_mes
             df_ext_var["Neto_A"] = df_ext_var["Neto_normalizado"] * ingreso_pro_fut
             variable = df_ext_var["Neto_normalizado"].sum()
             df_junto = pd.concat([df_ext_var, df_sum], ignore_index=True)
@@ -2003,11 +2039,7 @@ else:
             ingreso_pro = df_ext_var[df_ext_var["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
             df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
             df_ext_var = df_ext_var[~df_ext_var["Categoria_A"].isin(["INGRESO"])]
-            
-            df_ing_futu = df_2025[df_2025["Mes_A"] == mes_act]
-            df_ing_futu = df_ing_futu[df_ing_futu["Proyecto_A"].isin(codigo_pro)]
-            df_ing_futu = df_ing_futu[df_ing_futu["Categoria_A"] == "INGRESO"]
-            ingreso_pro_fut = df_ing_futu["Neto_A"].sum() / fecha_act * ultimo_dia_mes
+        
             
             df_ext_var["Neto_A"] = df_ext_var["Neto_normalizado"] * ingreso_pro_fut
 
@@ -2039,10 +2071,6 @@ else:
             df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
             df_ext_var = df_ext_var[~df_ext_var["Categoria_A"].isin(["INGRESO"])]
              
-            df_ing_futu = df_2025[df_2025["Mes_A"] == mes_act]
-            df_ing_futu = df_ing_futu[df_ing_futu["Proyecto_A"].isin(codigo_pro)]
-            df_ing_futu = df_ing_futu[df_ing_futu["Categoria_A"] == "INGRESO"]
-            ingreso_pro_fut = df_ing_futu["Neto_A"].sum() / fecha_act * ultimo_dia_mes
             df_ext_var["Neto_A"] = df_ext_var["Neto_normalizado"] * ingreso_pro_fut
 
             variable = df_ext_var["Neto_normalizado"].sum()
@@ -2081,10 +2109,6 @@ else:
                 df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
                 df_ext_var = df_ext_var[~df_ext_var["Categoria_A"].isin(["INGRESO"])]
                 
-                df_ing_futu = df_2025[df_2025["Mes_A"] == mes_act]
-                df_ing_futu = df_ing_futu[df_ing_futu["Proyecto_A"].isin(codigo_pro)]
-                df_ing_futu = df_ing_futu[df_ing_futu["Categoria_A"] == "INGRESO"]
-                ingreso_pro_fut = df_ing_futu["Neto_A"].sum() / fecha_act * ultimo_dia_mes
                 df_ext_var["Neto_A"] = df_ext_var["Neto_normalizado"] * ingreso_pro_fut
 
                 variable = df_ext_var["Neto_normalizado"].sum()
