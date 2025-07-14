@@ -1161,7 +1161,7 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
 
     # Tab 5: Original sin ajuste
     with tab1:
-        st.write("Proyección Lienal")
+        st.write("Proyección Original")
         construir_tabla(ingreso_pro_fut, coss_pro_ori, gadmn_pro_ori, oh_pro, intereses, id_tab=5)
 
 
