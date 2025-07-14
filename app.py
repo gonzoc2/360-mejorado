@@ -1470,16 +1470,20 @@ else:
 
 
             st.subheader("📊 Análisis Visual del Estado de Resultados por Proyecto")
+            # --- Filtro de proyecto ---
+            proyectos_disponibles = [col for col in df_tabla.columns if col != "Proyecto"]
+            proyecto_default = "ESGARI" if "ESGARI" in proyectos_disponibles else proyectos_disponibles[0]
+            proyecto_seleccionado = st.selectbox("Selecciona un proyecto para visualizar:", proyectos_disponibles, index=proyectos_disponibles.index(proyecto_default))
 
             # --- Convertir a formato largo para graficar ---
             df_limpio = df_tabla.set_index("Proyecto").T.reset_index().rename(columns={"index": "Proyecto"})
-            df_limpio = df_limpio.dropna(axis=1, how="all")  # por si alguna métrica está completamente vacía
+            df_limpio = df_limpio.dropna(axis=1, how="all")
 
             # --- Separar métricas monetarias y porcentuales ---
             metricas_pesos = [m for m, k in metricas_seleccionadas if not m.endswith("%")]
             metricas_porcentajes = [m for m, k in metricas_seleccionadas if m.endswith("%")]
 
-            # --- TABs para organización ---
+            # --- TABs ---
             tabs = st.tabs([
                 "💵 Comparativo de Ingresos y Utilidades",
                 "📈 Comparativo de Márgenes %",
@@ -1487,32 +1491,34 @@ else:
                 "🥧 Participación por Proyecto"
             ])
 
-            # --- TAB 1: Métricas monetarias ---
+            # --- TAB 1 ---
             with tabs[0]:
-                st.write("### Ingresos y Utilidades por Proyecto")
+                st.write("### Ingresos y Utilidades")
 
                 columnas_existentes = [m for m in metricas_pesos if m in df_limpio.columns]
+                df_proyecto = df_limpio[df_limpio["Proyecto"] == proyecto_seleccionado]
+
                 if columnas_existentes:
                     fig_montos = px.bar(
-                        df_limpio,
+                        df_proyecto,
                         x="Proyecto",
                         y=columnas_existentes,
                         barmode="group",
-                        title="Montos comparativos por proyecto",
-                        labels={"value": "Monto", "variable": "Métrica"}
+                        title=f"Montos comparativos del proyecto: {proyecto_seleccionado}",
+                        labels={"value": "Monto", "variable": "Métrica"},
+                        text_auto=".2s"
                     )
                     st.plotly_chart(fig_montos, use_container_width=True)
                 else:
                     st.info("No hay métricas monetarias disponibles para graficar.")
 
-            # --- TAB 2: Márgenes % ---
+            # --- TAB 2 ---
             with tabs[1]:
                 st.write("### Márgenes por Proyecto (%)")
 
                 columnas_margen = [m for m in metricas_porcentajes if m in df_limpio.columns]
-                df_margen = df_limpio.copy()
+                df_margen = df_limpio[df_limpio["Proyecto"] == proyecto_seleccionado].copy()
 
-                # Convertir a float si vienen como str con '%'
                 for col in columnas_margen:
                     try:
                         df_margen[col] = df_margen[col].replace("%", "", regex=True).astype(float)
@@ -1525,14 +1531,16 @@ else:
                         x="Proyecto",
                         y=columnas_margen,
                         barmode="group",
-                        title="Márgenes por proyecto",
-                        labels={"value": "%", "variable": "Métrica"}
+                        title=f"Márgenes del proyecto: {proyecto_seleccionado}",
+                        labels={"value": "%", "variable": "Métrica"},
+                        text_auto=".2f"
                     )
+                    fig_margenes.update_layout(yaxis=dict(tickformat=".0%"))
                     st.plotly_chart(fig_margenes, use_container_width=True)
                 else:
-                    st.info("No hay métricas de margen disponibles para graficar.")
+                    st.info("No hay métricas de margen disponibles.")
 
-            # --- TAB 3: Interactiva personalizada ---
+            # --- TAB 3 ---
             with tabs[2]:
                 st.write("### Comparación personalizada")
 
@@ -1540,26 +1548,28 @@ else:
                 metrica_default = "Ingresos" if "Ingresos" in columnas_disponibles else columnas_disponibles[0]
 
                 seleccion = st.multiselect(
-                    "Selecciona métricas para comparar entre proyectos:",
+                    "Selecciona métricas:",
                     options=columnas_disponibles,
                     default=[metrica_default]
                 )
 
                 if seleccion:
+                    df_custom = df_limpio[df_limpio["Proyecto"] == proyecto_seleccionado]
                     fig_custom = px.bar(
-                        df_limpio,
+                        df_custom,
                         x="Proyecto",
                         y=seleccion,
                         barmode="group",
-                        title="Comparación personalizada",
-                        labels={"value": "Valor", "variable": "Métrica"}
+                        title=f"Comparación personalizada para: {proyecto_seleccionado}",
+                        labels={"value": "Valor", "variable": "Métrica"},
+                        text_auto=".2s"
                     )
                     st.plotly_chart(fig_custom, use_container_width=True)
                 else:
-                    st.info("Selecciona al menos una métrica para visualizar.")
+                    st.info("Selecciona al menos una métrica.")
 
-
-            with tabs[3]:  # 🥧 Participación por Proyecto
+            # --- TAB 4 (Pastel, sin filtro) ---
+            with tabs[3]:
                 st.write("### Participación por Proyecto")
 
                 metricas_disponibles_pie = [m for m in metricas_pesos if m in df_limpio.columns]
@@ -1570,7 +1580,6 @@ else:
                     index=0 if "Ingresos" in metricas_disponibles_pie else 0
                 )
 
-                # Filtrar fuera ESGARI del gráfico
                 df_pie = df_limpio[["Proyecto", metrica_pastel]].copy()
                 df_pie = df_pie[df_pie["Proyecto"].str.upper() != "ESGARI"]
 
@@ -1587,6 +1596,7 @@ else:
                     hole=0.3
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
+
 
 
     elif selected == "Estado de Resultado":
