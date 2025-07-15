@@ -69,7 +69,7 @@ def validar_credenciales(df, username, password):
         proyectos = [p.strip() for p in str(fila["proyectos"]).split(",")]
         cecos = [c.strip() for c in str(fila["cecos"]).split(",")]
         return fila["usuario"], fila["rol"], proyectos, cecos
-    return None, None, None
+    return None, None, None, None
 
 def filtro_pro(col):
     df_visibles = proyectos[proyectos["proyectos"].astype(str).isin(st.session_state["proyectos"])]
