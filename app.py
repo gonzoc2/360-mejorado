@@ -763,28 +763,74 @@ def estdo_re(df_2025, ceco):
         )
         fig_bar.update_traces(marker_color="#00509E", textposition='outside')
         st.plotly_chart(fig_bar, use_container_width=True)
+        meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
 
-        # Gráfico de cascada (solo para usuarios no-gerentes)
-        if st.session_state['rol'] != "gerente":
-            conceptos = []
-            valores = []
-            for clave in ["ingreso_proyecto", "coss_total", "utilidad_bruta", "gadmn_pro", "utilidad_operativa", "oh_pro", "ebit", "gasto_fin_pro", "ingreso_fin_pro", "ebt"]:
-                nombre = [n for n, k in metricas_seleccionadas if k == clave]
-                if nombre and er.get(clave) is not None:
-                    conceptos.append(nombre[0])
-                    valores.append(er[clave])
+        # === TABLA HTML CON MESES COMO COLUMNAS Y FILAS ESTILIZADAS ===
+        st.markdown("### Estado de Resultado mensual")
 
-            fig_waterfall = go.Figure(go.Waterfall(
-                name="Estado de Resultado",
-                orientation="v",
-                measure=["relative"] * len(valores),
-                x=conceptos,
-                text=[f"${v:,.0f}" for v in valores],
-                y=valores,
-                connector={"line": {"color": "gray"}}
-            ))
-            fig_waterfall.update_layout(title="Flujo de Utilidad (Gráfico de Cascada)", showlegend=False)
-            st.plotly_chart(fig_waterfall, use_container_width=True)
+        # Construir tabla
+        df_mensual_col = pd.DataFrame()
+
+        for nombre_metrica, clave in metricas_seleccionadas:
+            fila = {"Concepto": nombre_metrica}
+            for mes in meses_ordenados:
+                if mes in df_2025["Mes_A"].unique():
+                    er_mes = estado_resultado(df_2025, [mes], proyecto_nombre, proyecto_codigo, list_pro)
+                    fila[mes] = er_mes.get(clave, 0)
+            df_mensual_col = pd.concat([df_mensual_col, pd.DataFrame([fila])])
+
+        # Guardar copia para descarga
+        df_mensual_col_excel = df_mensual_col.copy()
+
+        # Aplicar formato moneda para mostrar
+        for mes in meses_ordenados:
+            if mes in df_mensual_col.columns:
+                df_mensual_col[mes] = df_mensual_col[mes].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "")
+
+        # Identificador de tabla
+        i += 1
+
+        # Estilos con filas pintadas
+        st.markdown(f"""
+            <style>
+            .tab-table-{i} {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 10px 0;
+                font-size: 13px;
+                font-family: Arial, sans-serif;
+                text-align: left;
+            }}
+            .tab-table-{i} th {{
+                background-color: #003366;
+                color: white;
+                padding: 10px;
+                text-align: center;
+            }}
+            .tab-table-{i} td {{
+                padding: 8px;
+                text-align: center;
+                background-color: white;
+                color: black;
+            }}
+            .tab-table-{i} tr:hover {{
+                background-color: #f0f0f0;
+            }}
+            .tab-table-{i} tr:nth-child(1),
+            .tab-table-{i} tr:nth-child(5),
+            .tab-table-{i} tr:nth-child(7),
+            .tab-table-{i} tr:nth-child(9),
+            .tab-table-{i} tr:nth-child(12) {{
+                background-color: #003366;
+                color: white;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
+
+        html_mensual_col = df_mensual_col.to_html(index=False, escape=False, classes=f"tab-table-{i}")
+        st.markdown(html_mensual_col, unsafe_allow_html=True)
+
+        descargar_excel(df_mensual_col_excel, nombre_archivo="estado_resultado_mensual.xlsx")
 
 def texto_centrado(texto):
     st.markdown(f"<div style='text-align: center;'>{texto}</div>", unsafe_allow_html=True)
