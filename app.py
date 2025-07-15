@@ -2838,118 +2838,117 @@ else:
     )
 
     elif selected == "Ratios":
+        def filtro_pro_ratios(col):
+            df_visibles = proyectos[proyectos["proyectos"].astype(str).isin(st.session_state["proyectos"])]
+            nombre_a_codigo = dict(zip(df_visibles["nombre"], df_visibles["proyectos"].astype(str)))
+
+            proyectos_dict = {}
+
+            if st.session_state["proyectos"] == ["ESGARI"]:
+                opciones = ["ESGARI"] + proyectos["nombre"].tolist()
+                seleccionados = col.multiselect("Selecciona proyecto(s)", opciones, default=["ESGARI"])
+
+                if "ESGARI" in seleccionados:
+                    codigos_todos = proyectos["proyectos"].astype(str).tolist()
+                    proyectos_dict["ESGARI"] = codigos_todos
+
+                # Agregar otros proyectos seleccionados (si los hay)
+                seleccion_otros = [s for s in seleccionados if s != "ESGARI"]
+                proyectos_filtrados = proyectos[proyectos["nombre"].isin(seleccion_otros)]
+                for nombre, codigo in zip(proyectos_filtrados["nombre"], proyectos_filtrados["proyectos"].astype(str)):
+                    proyectos_dict[nombre] = codigo
+            else:
+                seleccionados = col.multiselect("Selecciona proyecto(s)", list(nombre_a_codigo.keys()))
+                for nombre in seleccionados:
+                    if nombre in nombre_a_codigo:
+                        proyectos_dict[nombre] = nombre_a_codigo[nombre]
+
+            return proyectos_dict
+
+        dic_proyectos = filtro_pro_ratios(st)
+
         st.write("Ratios de la empresa")
         col1, col2 = st.columns(2)
-        numerador_cat = col1.toggle("Numerador por categoría", value=True)
-        denminador_cat = col2.toggle("Denominador por categoría", value=True)
-
-        if numerador_cat:
-            df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
-            cate = df_cat["Categoria_A"].unique().tolist()
-            numera_cat = col1.selectbox(f"Selecciona una Categoría", cate, key="cat_numerador")
-            tipo_nu = "Categoria_A"
-
-        else:
-            df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
-            cate = df_cat["Cuenta_Nombre_A"].unique().tolist()
-            numera_cat = col1.selectbox("Selecciona una Cuenta", cate, key="cat_numerador")
-            tipo_nu = "Cuenta_Nombre_A"
-
-        if denminador_cat:
-            df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
-            cate = df_cat["Categoria_A"].unique().tolist()
-            denomi_cat = col2.selectbox("Selecciona una Categoría", cate, key="cat_denominador")
-            tipo_de = "Categoria_A"
-
-        else:
-            df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
-            cate = df_cat["Cuenta_Nombre_A"].unique().tolist()
-            denomi_cat = col2.selectbox("Selecciona una Cuenta", cate, key="cat_denominador")
-            tipo_de = "Cuenta_Nombre_A"
-        
+        numerador_cat = col1.toggle("Numerador por categoría", value=True, key=1)
+        denminador_cat = col2.toggle("Denominador por categoría", value=True, key=2)
         meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
         meses_disponibles = [mes for mes in meses_ordenados if mes in df_2025["Mes_A"].unique()]
         mes = st.multiselect("Selecciona los meses", meses_disponibles, default=meses_disponibles)
-        lista = {}
-        for x in mes:
-            df_mes = df_2025[df_2025["Mes_A"] == x]
-            numera = df_mes[df_mes[tipo_nu] == numera_cat]["Neto_A"].sum()
-            denomi = df_mes[df_mes[tipo_de] == denomi_cat]["Neto_A"].sum()
-            if denomi != 0:
-                ratio = numera / denomi
+
+        def ratios(numerador_cat, denminador_cat, mes, cla, dic_proyectos):
+            if numerador_cat:
+                df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
+                cate = df_cat["Categoria_A"].unique().tolist()
+                numera_cat = col1.selectbox(f"Selecciona una Categoría", cate, key=f"cat_numerador_{cla}")
+                tipo_nu = "Categoria_A"
             else:
-                ratio = 0
-            lista[x] = ratio
-        st.write(f"Ratio de {numera_cat} sobre {denomi_cat}")
+                df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
+                cate = df_cat["Cuenta_Nombre_A"].unique().tolist()
+                numera_cat = col1.selectbox("Selecciona una Cuenta", cate, key=f"cat_numerador_{cla}")
+                tipo_nu = "Cuenta_Nombre_A"
 
-        def render_ratio_table(ratio_dict):
-            tabla_html = """
-            <style>
-            table {
-                border-collapse: collapse;
-                width: 100%;
-                font-family: Arial, sans-serif;
-                margin-top: 10px;
-                background-color: white;
-                color: black;
-            }
-            th, td {
-                border: 1px solid #dddddd;
-                text-align: center;
-                padding: 8px;
-            }
-            th {
-                background-color: #003366;  /* Azul marino */
-                color: white;
-            }
-            tr:nth-child(even) {
-                background-color: #f9f9f9;
-            }
-            </style>
-            <table>
-                <tr>
-                    <th>Mes</th>
-                    <th>Ratio</th>
-                </tr>
-            """
-            for mes, valor in ratio_dict.items():
-                tabla_html += f"<tr><td>{mes}</td><td>{valor:.4f}</td></tr>"
-            tabla_html += "</table>"
-            return tabla_html
+            if denminador_cat:
+                df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
+                cate = df_cat["Categoria_A"].unique().tolist()
+                denomi_cat = col2.selectbox("Selecciona una Categoría", cate, key=f"cat_denominador_{cla}")
+                tipo_de = "Categoria_A"
+            else:
+                df_cat = df_2025[df_2025["Clasificacion_A"].isin(["COSS", "G.ADMN", "INGRESO"])]
+                cate = df_cat["Cuenta_Nombre_A"].unique().tolist()
+                denomi_cat = col2.selectbox("Selecciona una Cuenta", cate, key=f"cat_denominador_{cla}")
+                tipo_de = "Cuenta_Nombre_A"
 
-        st.markdown(render_ratio_table(lista), unsafe_allow_html=True)
+            data_plot = []
 
-        # Crear DataFrame ordenado
-        df_ratios = pd.DataFrame({
-            "Mes": list(lista.keys()),
-            "Ratio": list(lista.values())
-        })
+            for nombre_proy, codigos in dic_proyectos.items():
+                if not isinstance(codigos, list):
+                    codigos = [codigos]
 
-        # Ordenar por los meses esperados
-        df_ratios["Mes"] = pd.Categorical(df_ratios["Mes"], categories=meses_ordenados, ordered=True)
-        df_ratios = df_ratios.sort_values("Mes")
+                for m in mes:
+                    df_mes = df_2025[(df_2025["Mes_A"] == m) & (df_2025["Proyecto_A"].isin(codigos))]
+                    numera = df_mes[df_mes[tipo_nu] == numera_cat]["Neto_A"].sum()
+                    denomi = df_mes[df_mes[tipo_de] == denomi_cat]["Neto_A"].sum()
+                    ratio = numera / denomi if denomi != 0 else 0
 
-        # Crear gráfico con etiquetas
-        fig = px.line(
-            df_ratios, 
-            x="Mes", 
-            y="Ratio", 
-            title=f"Ratio: {numera_cat} / {denomi_cat}",
-            markers=True,
-            text=df_ratios["Ratio"].apply(lambda x: f"{x:.2}")  # Etiquetas en porcentaje
-        )
+                    data_plot.append({
+                        "Mes": m,
+                        "Proyecto": nombre_proy,
+                        "Ratio": ratio
+                    })
 
-        fig.update_traces(textposition="top center", line_color="#003366")
-        fig.update_layout(
-            title_font_size=20,
-            title_font_color="White",
-            xaxis_title="Mes",
-            yaxis_title="Ratio",
-            #yaxis=dict(tickformat=".0%"),
-            font=dict(color="white")
-        )
+            df_plot = pd.DataFrame(data_plot)
+            df_plot["Mes"] = pd.Categorical(df_plot["Mes"], categories=meses_ordenados, ordered=True)
+            df_plot = df_plot.sort_values(["Proyecto", "Mes"])
 
-        st.plotly_chart(fig, use_container_width=True)
+            fig = px.line(
+                df_plot,
+                x="Mes",
+                y="Ratio",
+                color="Proyecto",
+                markers=True,
+                title=f"Ratio: {numera_cat} / {denomi_cat}",
+                text=df_plot["Ratio"].apply(lambda x: f"{x:.2}")
+            )
+
+            fig.update_traces(textposition="top center")
+            fig.update_layout(
+                title_font_size=20,
+                title_font_color="White",
+                xaxis_title="Mes",
+                yaxis_title="Ratio",
+                font=dict(color="white"),
+                hovermode="x unified"
+            )
+
+            st.plotly_chart(fig, use_container_width=True, key=cla)
+
+
+        ratios(numerador_cat, denminador_cat, mes, cla="hola", dic_proyectos=dic_proyectos)
+
+        col1, col2 = st.columns(2)
+        numerador_cat_2 = col1.toggle("Numerador por categoría", value=True, key=3)
+        denminador_cat_2 = col2.toggle("Denominador por categoría", value=True, key=4)
+        ratios(numerador_cat_2, denminador_cat_2, mes, cla="adios", dic_proyectos=dic_proyectos)
 
     
     
