@@ -3071,7 +3071,7 @@ else:
         else:
             st.warning("No hay resultados para mostrar. Revisa tu configuración.")
 
-        elif selected == "Dashboard":
+    elif selected == "Dashboard":
         st.title("📊 Dashboard Ejecutivo ESGARI 360")
 
         col1, col2 = st.columns(2)
