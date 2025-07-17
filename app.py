@@ -1341,7 +1341,7 @@ else:
     if st.session_state["rol"] in ["director", "admin"] and "ESGARI" in st.session_state["proyectos"]:
         selected = option_menu(
         menu_title=None,
-        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios", "Dashboard", "Escenarios", "Benchmark", "Simulador"],
+        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios", "Dashboard", "Benchmark", "Simulador"],
         icons = [
                 "house",                # Resumen
                 "clipboard-data",       # Estado de Resultado
@@ -1355,7 +1355,6 @@ else:
                 "person-gear",          # CeCo -> "Centro de Costos"
                 "percent",               # Ratios
                 "speedometer" ,         # Dashboard
-                "layers",
                 "trophy",
                 "sliders",
             ],
@@ -3140,110 +3139,6 @@ else:
         trend_card("COSS", er["coss_total"], er_ly["coss_total"], er_ppt["coss_total"])
         trend_card("G.ADMN", er["gadmn_pro"], er_ly["gadmn_pro"], er_ppt["gadmn_pro"])
         trend_card("Gasto Financiero", er["gasto_fin_pro"], er_ly["gasto_fin_pro"], er_ppt["gasto_fin_pro"])
-
-
-    elif selected == "Escenarios":
-        st.title("Escenario Personalizado")
-
-        col1, col2 = st.columns(2)
-        meses_seleccionado = filtro_meses(col1, df_2025)
-        proyecto_codigo, proyecto_nombre = filtro_pro(col2)
-
-        if not meses_seleccionado:
-            st.warning("Selecciona uno o más meses.")
-        else:
-            # === 1. Calcular PATIO y OH desde el df completo
-            patio_pro = patio(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre)
-            oh_pro = oh(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre)
-            gasto_fin_pro, _, _ = gasto_fin(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre, list_pro)
-            ingreso_fin_pro, _, _ = ingreso_fin(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre, list_pro)
-
-            # === 2. Excluir proyectos 8002, 8003, 8004
-            excluidos = ["8002", "8003", "8004"]
-            
-            if proyecto_nombre == "ESGARI":
-                df_filtrado = df_2025[
-                (df_2025["Mes_A"].isin(meses_seleccionado)) &
-                (~df_2025["Proyecto_A"].isin(excluidos))
-            ]
-            else:
-                df_filtrado = df_2025[
-                    (df_2025["Mes_A"].isin(meses_seleccionado)) &
-                    (df_2025["Proyecto_A"].isin(proyecto_codigo)) &
-                    (~df_2025["Proyecto_A"].isin(excluidos))
-                ]
-            # === 3. Ingreso base real solo de los proyectos permitidos
-            ingreso_base = df_filtrado[df_filtrado["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
-
-            # === 4. Variables normalizadas
-            categorias_variables = ["FLETES", "CASETAS", "COMBUSTIBLE", "OTROS COSS"]
-            df_ext_var = df_filtrado[df_filtrado["Categoria_A"].isin(categorias_variables)].copy()
-            df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_base if ingreso_base != 0 else 0
-
-            # === 5. Gastos fijos (excluyendo variables e ingreso)
-            categorias_excluir = categorias_variables + ["INGRESO"]
-            df_sum = df_filtrado[~df_filtrado["Categoria_A"].isin(categorias_excluir)].copy()
-            if proyecto_nombre == "ESGARI":
-                df_intereses = df_filtrado.copy()
-            else:
-                df_intereses = df_sum.copy()
-
-            intereses = gasto_fin_pro - ingreso_fin_pro
-
-            # === Ajustes del usuario
-            st.subheader("Ajustes Personalizados")
-            ingreso_factor = st.slider("📈 Ajuste % Ingreso", 0.80, 1.20, 1.00, 0.01)
-            variable_factor = st.slider("⚙️ Ajuste % Costos Variables (Eficiencia Operativa)", 0.80, 1.20, 1.00, 0.01)
-
-            ingreso_esc = ingreso_base * ingreso_factor
-
-            df_ext_var_adj = df_ext_var.copy()
-            df_ext_var_adj["Neto_A"] = df_ext_var_adj["Neto_normalizado"] * ingreso_esc * variable_factor
-            df_ext_var_adj = df_ext_var_adj.drop(columns=["Neto_normalizado"])
-
-            df_junto = pd.concat([df_ext_var_adj, df_sum], ignore_index=True)
-            
-            coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum()
-            gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
-
-            utilidad_op = ingreso_esc - coss_pro - gadmn_pro - patio_pro
-            ebit = utilidad_op - oh_pro
-            ebt = ebit - intereses
-            df_resumen = pd.DataFrame({
-                "Concepto": [
-                    "Ingresos Proyectados",
-                    "COSS Variables",
-                    "PATIO",
-                    "Gastos Administrativos",
-                    "Utilidad Operativa",
-                    "% Utilidad Operativa",
-                    "OH",
-                    "EBIT",
-                    "Intereses",
-                    "EBT",
-                    "% EBT",
-                    "Δ Ingreso %",
-                    "Δ Variables %"
-                ],
-                "Valor": [
-                    f"${ingreso_esc:,.2f}",
-                    f"${coss_pro:,.2f}",
-                    f"${patio_pro:,.2f}",
-                    f"${gadmn_pro:,.2f}",
-                    f"${utilidad_op:,.2f}",
-                    f"{(utilidad_op / ingreso_esc):.2%}" if ingreso_esc else "N/A",
-                    f"${oh_pro:,.2f}",
-                    f"${ebit:,.2f}",
-                    f"${intereses:,.2f}",
-                    f"${ebt:,.2f}",
-                    f"{(ebt / ingreso_esc):.2%}" if ingreso_esc else "N/A",
-                    f"{(ingreso_factor - 1):+.2%}",
-                    f"{(variable_factor - 1):+.2%}"
-                ]
-            })
-
-
-            mostrar_tabla_estilizada(df_resumen, id=91)
 
 
     elif selected == "Benchmark":
