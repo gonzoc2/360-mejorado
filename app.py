@@ -1341,7 +1341,7 @@ else:
     if st.session_state["rol"] in ["director", "admin"] and "ESGARI" in st.session_state["proyectos"]:
         selected = option_menu(
         menu_title=None,
-        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios"],
+        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios", "Dashboard", "Escenarios", "Benchmark", "Simulador"],
         icons = [
                 "house",                # Resumen
                 "clipboard-data",       # Estado de Resultado
@@ -1353,7 +1353,11 @@ else:
                 "calendar",             # Meses
                 "graph-up",             # Mes Corregido
                 "person-gear",          # CeCo -> "Centro de Costos"
-                "percent"               # Ratios
+                "percent",               # Ratios
+                "speedometer" ,         # Dashboard
+                "layers",
+                "trophy",
+                "sliders",
             ],
         default_index=0,
         orientation="horizontal",)
@@ -3067,5 +3071,403 @@ else:
         else:
             st.warning("No hay resultados para mostrar. Revisa tu configuración.")
 
-    
+        elif selected == "Dashboard":
+        st.title("📊 Dashboard Ejecutivo ESGARI 360")
+
+        col1, col2 = st.columns(2)
+        meses_sel = filtro_meses(col1, df_2025)
+        proyecto_codigo, proyecto_nombre = filtro_pro(col2)
+
+        if not meses_sel:
+            st.warning("Selecciona al menos un mes para continuar.")
+        else:
+            er = estado_resultado(df_2025, meses_sel, proyecto_nombre, proyecto_codigo, list_pro)
+            er_ppt = estado_resultado(df_ppt, meses_sel, proyecto_nombre, proyecto_codigo, list_pro)
+
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Ingreso", f"${er['ingreso_proyecto']:,.0f}", f"vs PPT: {((er['ingreso_proyecto']/er_ppt['ingreso_proyecto'])-1)*100:.1f}%")
+            col2.metric("Utilidad Operativa", f"${er['utilidad_operativa']:,.0f}", f"{er['por_utilidad_operativa']*100:.1f}%")
+            col3.metric("EBT", f"${er['ebt']:,.0f}", f"{er['por_ebt']*100:.1f}%")
+
+            st.subheader("🚨 Alertas Rápidas")
+            alertas = []
+
+            if er["por_utilidad_operativa"] < 0.24:
+                alertas.append(f"🔴 Margen U. Operativa bajo: {er['por_utilidad_operativa']*100:.1f}% (meta: 24%)")
+
+            if er["por_ebt"] < 0.115:
+                alertas.append(f"🟠 Margen EBT bajo: {er['por_ebt']*100:.1f}% (meta: 11.5%)")
+
+            if er["ingreso_proyecto"] < er_ppt["ingreso_proyecto"]:
+                delta_ing = ((er["ingreso_proyecto"]/er_ppt["ingreso_proyecto"]) - 1) * 100
+                alertas.append(f"🟠 Ingreso por debajo del presupuesto: {delta_ing:.1f}%")
+
+            if not alertas:
+                st.success("✅ Sin alertas críticas este periodo")
+            else:
+                for a in alertas:
+                    st.warning(a)
+
+            st.subheader("🧩 Composición del Ingreso")
+
+            fig = go.Figure(data=[
+                go.Pie(
+                    labels=["COSS", "G.ADMN", "Gastos Financieros"],
+                    values=[
+                        er['coss_total'],
+                        er['gadmn_pro'],
+                        er['gasto_fin_pro']
+                    ],
+                    hole=0.4,
+                    textinfo="label+percent"
+                )
+            ])
+            fig.update_layout(title="Distribución del ingreso total", height=400)
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("📉 Tendencias vs LY y Presupuesto")
+
+        # Comparativos adicionales
+        er_ly = estado_resultado(df_ly, meses_sel, proyecto_nombre, proyecto_codigo, list_pro)
+
+        def trend_card(label, actual, ly, ppt):
+            col1, col2, col3 = st.columns(3)
+            col1.metric(label, f"${actual:,.0f}")
+            col2.metric("vs LY", f"${actual - ly:,.0f}", f"{((actual / ly) - 1) * 100:.1f}%" if ly != 0 else "N/A")
+            col3.metric("vs PPT", f"${actual - ppt:,.0f}", f"{((actual / ppt) - 1) * 100:.1f}%" if ppt != 0 else "N/A")
+
+        trend_card("Ingreso", er["ingreso_proyecto"], er_ly["ingreso_proyecto"], er_ppt["ingreso_proyecto"])
+        trend_card("COSS", er["coss_total"], er_ly["coss_total"], er_ppt["coss_total"])
+        trend_card("G.ADMN", er["gadmn_pro"], er_ly["gadmn_pro"], er_ppt["gadmn_pro"])
+        trend_card("Gasto Financiero", er["gasto_fin_pro"], er_ly["gasto_fin_pro"], er_ppt["gasto_fin_pro"])
+
+
+    elif selected == "Escenarios":
+        st.title("Escenario Personalizado")
+
+        col1, col2 = st.columns(2)
+        meses_seleccionado = filtro_meses(col1, df_2025)
+        proyecto_codigo, proyecto_nombre = filtro_pro(col2)
+
+        if not meses_seleccionado:
+            st.warning("Selecciona uno o más meses.")
+        else:
+            # === 1. Calcular PATIO y OH desde el df completo
+            patio_pro = patio(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre)
+            oh_pro = oh(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre)
+            gasto_fin_pro, _, _ = gasto_fin(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre, list_pro)
+            ingreso_fin_pro, _, _ = ingreso_fin(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre, list_pro)
+
+            # === 2. Excluir proyectos 8002, 8003, 8004
+            excluidos = ["8002", "8003", "8004"]
+            
+            if proyecto_nombre == "ESGARI":
+                df_filtrado = df_2025[
+                (df_2025["Mes_A"].isin(meses_seleccionado)) &
+                (~df_2025["Proyecto_A"].isin(excluidos))
+            ]
+            else:
+                df_filtrado = df_2025[
+                    (df_2025["Mes_A"].isin(meses_seleccionado)) &
+                    (df_2025["Proyecto_A"].isin(proyecto_codigo)) &
+                    (~df_2025["Proyecto_A"].isin(excluidos))
+                ]
+            # === 3. Ingreso base real solo de los proyectos permitidos
+            ingreso_base = df_filtrado[df_filtrado["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
+
+            # === 4. Variables normalizadas
+            categorias_variables = ["FLETES", "CASETAS", "COMBUSTIBLE", "OTROS COSS"]
+            df_ext_var = df_filtrado[df_filtrado["Categoria_A"].isin(categorias_variables)].copy()
+            df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_base if ingreso_base != 0 else 0
+
+            # === 5. Gastos fijos (excluyendo variables e ingreso)
+            categorias_excluir = categorias_variables + ["INGRESO"]
+            df_sum = df_filtrado[~df_filtrado["Categoria_A"].isin(categorias_excluir)].copy()
+            if proyecto_nombre == "ESGARI":
+                df_intereses = df_filtrado.copy()
+            else:
+                df_intereses = df_sum.copy()
+
+            intereses = gasto_fin_pro - ingreso_fin_pro
+
+            # === Ajustes del usuario
+            st.subheader("Ajustes Personalizados")
+            ingreso_factor = st.slider("📈 Ajuste % Ingreso", 0.80, 1.20, 1.00, 0.01)
+            variable_factor = st.slider("⚙️ Ajuste % Costos Variables (Eficiencia Operativa)", 0.80, 1.20, 1.00, 0.01)
+
+            ingreso_esc = ingreso_base * ingreso_factor
+
+            df_ext_var_adj = df_ext_var.copy()
+            df_ext_var_adj["Neto_A"] = df_ext_var_adj["Neto_normalizado"] * ingreso_esc * variable_factor
+            df_ext_var_adj = df_ext_var_adj.drop(columns=["Neto_normalizado"])
+
+            df_junto = pd.concat([df_ext_var_adj, df_sum], ignore_index=True)
+            
+            coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum()
+            gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+
+            utilidad_op = ingreso_esc - coss_pro - gadmn_pro - patio_pro
+            ebit = utilidad_op - oh_pro
+            ebt = ebit - intereses
+            df_resumen = pd.DataFrame({
+                "Concepto": [
+                    "Ingresos Proyectados",
+                    "COSS Variables",
+                    "PATIO",
+                    "Gastos Administrativos",
+                    "Utilidad Operativa",
+                    "% Utilidad Operativa",
+                    "OH",
+                    "EBIT",
+                    "Intereses",
+                    "EBT",
+                    "% EBT",
+                    "Δ Ingreso %",
+                    "Δ Variables %"
+                ],
+                "Valor": [
+                    f"${ingreso_esc:,.2f}",
+                    f"${coss_pro:,.2f}",
+                    f"${patio_pro:,.2f}",
+                    f"${gadmn_pro:,.2f}",
+                    f"${utilidad_op:,.2f}",
+                    f"{(utilidad_op / ingreso_esc):.2%}" if ingreso_esc else "N/A",
+                    f"${oh_pro:,.2f}",
+                    f"${ebit:,.2f}",
+                    f"${intereses:,.2f}",
+                    f"${ebt:,.2f}",
+                    f"{(ebt / ingreso_esc):.2%}" if ingreso_esc else "N/A",
+                    f"{(ingreso_factor - 1):+.2%}",
+                    f"{(variable_factor - 1):+.2%}"
+                ]
+            })
+
+
+            mostrar_tabla_estilizada(df_resumen, id=91)
+
+
+    elif selected == "Benchmark":
+        st.title("🏆 Benchmark entre Proyectos")
+
+        col1, col2 = st.columns(2)
+        meses_sel = filtro_meses(col1, df_2025)
+
+        if not meses_sel:
+            st.warning("Selecciona al menos un mes.")
+        else:
+            # === Diccionario de nombres legibles de proyectos
+            nombre_dict = dict(zip(proyectos["proyectos"].astype(str), proyectos["nombre"]))
+
+            # === Excluir proyectos auxiliares
+            excluidos = ["8002", "8003", "8004"]
+            proyectos_validos = [
+                p for p in df_2025["Proyecto_A"].unique()
+                if p not in excluidos and p in nombre_dict
+            ]
+
+            resultados = []
+
+            for proyecto in proyectos_validos:
+                nombre = nombre_dict[proyecto]
+                codigo = [proyecto]
+
+                # === KPI base
+                ingreso_val = ingreso(df_2025, meses_sel, codigo, nombre)
+                patio_val = patio(df_2025, meses_sel, codigo, nombre)
+                oh_val = oh(df_2025, meses_sel, codigo, nombre)
+
+                gasto_fin_val, _, _ = gasto_fin(df_2025, meses_sel, codigo, nombre, list_pro)
+                ingreso_fin_val, _, _ = ingreso_fin(df_2025, meses_sel, codigo, nombre, list_pro)
+                intereses = gasto_fin_val - ingreso_fin_val
+
+                df_proj = df_2025[
+                    (df_2025["Mes_A"].isin(meses_sel)) &
+                    (df_2025["Proyecto_A"] == proyecto)
+                ]
+
+                coss_val = df_proj[df_proj["Clasificacion_A"] == "COSS"]["Neto_A"].sum()
+                gadmn_val = df_proj[df_proj["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+
+                uo_val = ingreso_val - coss_val - gadmn_val - patio_val
+                ebit_val = uo_val - oh_val
+                ebt_val = ebit_val - intereses
+
+                resultados.append({
+                    "Proyecto": nombre,
+                    "Ingreso": ingreso_val,
+                    "EBT": ebt_val,
+                    "Utilidad Operativa": uo_val,
+                    "Margen EBT (%)": ebt_val / ingreso_val if ingreso_val else 0,
+                    "Margen UO (%)": uo_val / ingreso_val if ingreso_val else 0,
+                    "% G.ADMN": gadmn_val / ingreso_val if ingreso_val else 0,
+                    "% COSS": coss_val / ingreso_val if ingreso_val else 0,
+                    "OH": oh_val,
+                    "Intereses": intereses,
+                    "PATIO": patio_val
+                })
+
+            df_benchmark = pd.DataFrame(resultados)
+
+            # === Orden por KPI
+            kpi_orden = col2.selectbox("📌 Ordenar por KPI", [
+                "EBT", "Margen EBT (%)", "Margen UO (%)", "% G.ADMN", "% COSS", "Utilidad Operativa"
+            ])
+
+            df_benchmark = df_benchmark.sort_values(
+                by=kpi_orden,
+                ascending=(kpi_orden in ["% G.ADMN", "% COSS"])
+            )
+
+            # === Formato visual
+            df_viz = df_benchmark.copy()
+            df_viz["EBT"] = df_viz["EBT"].map("${:,.0f}".format)
+            df_viz["Ingreso"] = df_viz["Ingreso"].map("${:,.0f}".format)
+            df_viz["Utilidad Operativa"] = df_viz["Utilidad Operativa"].map("${:,.0f}".format)
+            df_viz["OH"] = df_viz["OH"].map("${:,.0f}".format)
+            df_viz["Intereses"] = df_viz["Intereses"].map("${:,.0f}".format)
+            df_viz["PATIO"] = df_viz["PATIO"].map("${:,.0f}".format)
+
+            for col in ["Margen EBT (%)", "Margen UO (%)", "% G.ADMN", "% COSS"]:
+                df_viz[col] = df_viz[col].map("{:.2%}".format)
+
+            st.subheader("📊 Tabla de Benchmark")
+            st.dataframe(df_viz, use_container_width=True)
+
+            st.subheader(f"📈 Gráfico de {kpi_orden}")
+
+            df_plot = df_benchmark[["Proyecto", kpi_orden]].copy()
+            is_percent = "%" in kpi_orden
+
+            fig = px.bar(
+                df_plot,
+                x="Proyecto",
+                y=kpi_orden,
+                text=df_plot[kpi_orden].map(lambda x: f"{x:.2%}" if is_percent else f"${x:,.0f}")
+            )
+
+            fig.update_traces(textposition="outside")
+            fig.update_layout(
+                yaxis_tickformat=".0%" if is_percent else None,
+                yaxis_title=kpi_orden,
+                xaxis_title="Proyecto",
+                height=500
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+
+    elif selected == "Simulador":
+        st.title("🧪 Simulador de Decisiones")
+
+        col1, col2 = st.columns(2)
+        meses_seleccionado = filtro_meses(col1, df_2025)
+        proyecto_codigo, proyecto_nombre = filtro_pro(col2)
+
+        if not meses_seleccionado:
+            st.warning("Selecciona uno o más meses.")
+        else:
+            # 1. Calcular PATIO, OH, INTERESES del df completo
+            patio_pro = patio(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre)
+            oh_pro = oh(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre)
+            gasto_fin_pro, _, _ = gasto_fin(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre, list_pro)
+            ingreso_fin_pro, _, _ = ingreso_fin(df_2025, meses_seleccionado, proyecto_codigo, proyecto_nombre, list_pro)
+            intereses_base = gasto_fin_pro - ingreso_fin_pro
+
+            # 2. Filtrar gastos excluyendo proyectos auxiliares
+            excluidos = ["8002", "8003", "8004"]
+            if proyecto_nombre == "ESGARI":
+                df_filtrado = df_2025[
+                    (df_2025["Mes_A"].isin(meses_seleccionado)) &
+                    (~df_2025["Proyecto_A"].isin(excluidos))
+                ]
+            else:
+                df_filtrado = df_2025[
+                    (df_2025["Mes_A"].isin(meses_seleccionado)) &
+                    (df_2025["Proyecto_A"].isin(proyecto_codigo)) &
+                    (~df_2025["Proyecto_A"].isin(excluidos))
+                ]
+
+            ingreso_base = df_filtrado[df_filtrado["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
+
+            # 3. Variables normalizadas por categoría
+            categorias_variables = ["FLETES", "CASETAS", "COMBUSTIBLE", "OTROS COSS"]
+            df_ext_var = df_filtrado[df_filtrado["Categoria_A"].isin(categorias_variables)].copy()
+            df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_base if ingreso_base else 0
+
+            # 4. Gastos fijos
+            categorias_excluir = categorias_variables + ["INGRESO"]
+            df_sum = df_filtrado[~df_filtrado["Categoria_A"].isin(categorias_excluir)].copy()
+
+            # === Sliders distribuidos horizontalmente
+            st.subheader("🎛 Ajustes por categoría")
+
+            col_ing, col_int = st.columns([3, 1])
+            ingreso_factor = col_ing.slider("📈 Ingreso", 0.80, 1.20, 1.00, 0.01)
+            intereses_factor = col_int.slider("💵 Intereses", 0.50, 1.50, 1.00, 0.05)
+
+            col1, col2, col3, col4 = st.columns(4)
+            fletes_factor = col1.slider("🚛 Fletes", 0.5, 1.5, 1.0, 0.05)
+            casetas_factor = col2.slider("🛣️ Casetas", 0.5, 1.5, 1.0, 0.05)
+            combustible_factor = col3.slider("⛽ Combustible", 0.5, 1.5, 1.0, 0.05)
+            otros_factor = col4.slider("📦 Otros COSS", 0.5, 1.5, 1.0, 0.05)
+
+            col5, col6, col7 = st.columns(3)
+            gadmn_factor = col5.slider("🏢 G.ADMN", 0.5, 1.5, 1.0, 0.05)
+            patio_factor = col6.slider("🏗️ PATIO", 0.5, 1.5, 1.0, 0.05)
+            oh_factor = col7.slider("⚙️ OH", 0.5, 1.5, 1.0, 0.05)
+
+            ingreso_esc = ingreso_base * ingreso_factor
+            intereses_esc = intereses_base * intereses_factor
+            patio_esc = patio_pro * patio_factor
+            oh_esc = oh_pro * oh_factor
+
+            # Variables ajustadas individualmente
+            ajustes = {
+                "FLETES": fletes_factor,
+                "CASETAS": casetas_factor,
+                "COMBUSTIBLE": combustible_factor,
+                "OTROS COSS": otros_factor
+            }
+
+            df_ext_var_adj = df_ext_var.copy()
+            df_ext_var_adj["Neto_A"] = df_ext_var_adj.apply(
+                lambda row: row["Neto_normalizado"] * ingreso_esc * ajustes.get(row["Categoria_A"], 1.0),
+                axis=1
+            )
+            df_ext_var_adj = df_ext_var_adj.drop(columns=["Neto_normalizado"])
+            df_sum.loc[df_sum["Clasificacion_A"] == "G.ADMN", "Neto_A"] *= gadmn_factor
+
+
+            df_junto = pd.concat([df_ext_var_adj, df_sum], ignore_index=True)
+
+            coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum()
+            gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+
+            utilidad_op = ingreso_esc - coss_pro - gadmn_pro - patio_esc
+            ebit = utilidad_op - oh_esc
+            ebt = ebit - intereses_esc
+
+            df_resultado = pd.DataFrame({
+                "Concepto": [
+                    "Ingresos Proyectados", "COSS Variables", "PATIO", "Gastos Administrativos",
+                    "Utilidad Operativa", "% Utilidad Operativa", "OH", "EBIT",
+                    "Intereses", "EBT", "% EBT"
+                ],
+                "Valor": [
+                    f"${ingreso_esc:,.2f}",
+                    f"${coss_pro:,.2f}",
+                    f"${patio_esc:,.2f}",
+                    f"${gadmn_pro:,.2f}",
+                    f"${utilidad_op:,.2f}",
+                    f"{(utilidad_op / ingreso_esc):.2%}" if ingreso_esc else "N/A",
+                    f"${oh_esc:,.2f}",
+                    f"${ebit:,.2f}",
+                    f"${intereses_esc:,.2f}",
+                    f"${ebt:,.2f}",
+                    f"{(ebt / ingreso_esc):.2%}" if ingreso_esc else "N/A"
+                ]
+            })
+
+            mostrar_tabla_estilizada(df_resultado, id=93)
+
     
