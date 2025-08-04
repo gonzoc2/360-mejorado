@@ -2567,19 +2567,26 @@ else:
                 st.subheader("Ingresos vs Utilidad Operativa")
 
                 columnas_graf1 = [col for col in ["Ingresos", "Utilidad Operativa"] if col in df_graficas.columns]
-
+                
                 if len(columnas_graf1) >= 2:
+                    df_graficas["Ingresos_label"] = df_graficas["Ingresos"].apply(lambda x: f"${x:,.0f}")
+                    df_graficas["Utilidad Operativa_label"] = df_graficas["Utilidad Operativa"].apply(lambda x: f"${x:,.0f}")
+                
                     fig1 = px.line(
                         df_graficas,
                         x="Mes",
                         y=columnas_graf1,
                         markers=True,
                         title="Evolución mensual: Ingresos vs Utilidad Operativa",
-                        labels={"value": "Monto", "variable": "Concepto"}
+                        labels={"value": "Monto", "variable": "Concepto"},
+                        text=df_graficas[columnas_graf1[0]] if len(columnas_graf1) == 1 else None  # fallback
                     )
+                
+                    fig1.update_traces(textposition="top center")
                     st.plotly_chart(fig1, use_container_width=True)
                 else:
                     st.info("No hay suficientes datos disponibles para esta gráfica.")
+
 
             # --- TAB 2: Composición de Gastos ---
             with tabs[1]:
@@ -3377,6 +3384,7 @@ else:
             mostrar_tabla_estilizada(df_resultado, id=93)
 
     
+
 
 
 
