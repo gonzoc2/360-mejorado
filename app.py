@@ -3083,7 +3083,7 @@ else:
             st.warning("No hay resultados para mostrar. Revisa tu configuración.")
 
     elif selected == "Dashboard":
-        st.title("📊 Dashboard Ejecutivo ESGARI 360")
+        st.title("📊 Dashboard Ejecutivo")
 
         col1, col2 = st.columns(2)
         meses_sel = filtro_meses(col1, df_2025)
@@ -3377,6 +3377,7 @@ else:
             mostrar_tabla_estilizada(df_resultado, id=93)
 
     
+
 
 
 
