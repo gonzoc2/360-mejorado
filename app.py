@@ -3054,7 +3054,7 @@ else:
                 text="Ratio_label",
                 title="Ratios por mes y proyecto"
             )
-
+            fig.update_traces(textposition="top center")
             fig.update_layout(
                 height=500,
                 legend_title="Ratio",
@@ -3377,5 +3377,6 @@ else:
             mostrar_tabla_estilizada(df_resultado, id=93)
 
     
+
 
 
