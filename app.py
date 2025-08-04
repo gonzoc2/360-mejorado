@@ -2569,7 +2569,10 @@ else:
                 columnas_graf1 = [col for col in ["Ingresos", "Utilidad Operativa"] if col in df_graficas.columns]
                 
                 if len(columnas_graf1) >= 2:
-                    df_graficas["Ingresos_label"] = df_graficas["Ingresos"].apply(lambda x: f"${x:,.0f}")
+                    df_graficas["Ingresos_label"] = pd.to_numeric(df_graficas["Ingresos"], errors="coerce").apply(
+                        lambda x: f"${x:,.0f}" if pd.notnull(x) else ""
+                    )
+
                     df_graficas["Utilidad Operativa_label"] = df_graficas["Utilidad Operativa"].apply(lambda x: f"${x:,.0f}")
                 
                     fig1 = px.line(
@@ -3384,6 +3387,7 @@ else:
             mostrar_tabla_estilizada(df_resultado, id=93)
 
     
+
 
 
 
