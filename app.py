@@ -3119,7 +3119,7 @@ else:
                 for a in alertas:
                     st.warning(a)
 
-            st.subheader("🧩 Composición del Ingreso")
+            st.subheader("Composición de los gastos")
 
             fig = go.Figure(data=[
                 go.Pie(
@@ -3133,7 +3133,7 @@ else:
                     textinfo="label+percent"
                 )
             ])
-            fig.update_layout(title="Distribución del ingreso total", height=400)
+            
             st.plotly_chart(fig, use_container_width=True)
 
         st.subheader("📉 Tendencias vs LY y Presupuesto")
@@ -3151,7 +3151,6 @@ else:
         trend_card("COSS", er["coss_total"], er_ly["coss_total"], er_ppt["coss_total"])
         trend_card("G.ADMN", er["gadmn_pro"], er_ly["gadmn_pro"], er_ppt["gadmn_pro"])
         trend_card("Gasto Financiero", er["gasto_fin_pro"], er_ly["gasto_fin_pro"], er_ppt["gasto_fin_pro"])
-
 
     elif selected == "Benchmark":
         st.title("🏆 Benchmark entre Proyectos")
@@ -3378,6 +3377,7 @@ else:
             mostrar_tabla_estilizada(df_resultado, id=93)
 
     
+
 
 
 
