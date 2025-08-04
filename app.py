@@ -2567,25 +2567,16 @@ else:
                 st.subheader("Ingresos vs Utilidad Operativa")
 
                 columnas_graf1 = [col for col in ["Ingresos", "Utilidad Operativa"] if col in df_graficas.columns]
-                
-                if len(columnas_graf1) >= 2:
-                    df_graficas["Ingresos_label"] = pd.to_numeric(df_graficas["Ingresos"], errors="coerce").apply(
-                        lambda x: f"${x:,.0f}" if pd.notnull(x) else ""
-                    )
 
-                    df_graficas["Utilidad Operativa_label"] = df_graficas["Utilidad Operativa"].apply(lambda x: f"${x:,.0f}")
-                
+                if len(columnas_graf1) >= 2:
                     fig1 = px.line(
                         df_graficas,
                         x="Mes",
                         y=columnas_graf1,
                         markers=True,
                         title="Evolución mensual: Ingresos vs Utilidad Operativa",
-                        labels={"value": "Monto", "variable": "Concepto"},
-                        text=df_graficas[columnas_graf1[0]] if len(columnas_graf1) == 1 else None  # fallback
+                        labels={"value": "Monto", "variable": "Concepto"}
                     )
-                
-                    fig1.update_traces(textposition="top center")
                     st.plotly_chart(fig1, use_container_width=True)
                 else:
                     st.info("No hay suficientes datos disponibles para esta gráfica.")
@@ -3387,6 +3378,7 @@ else:
             mostrar_tabla_estilizada(df_resultado, id=93)
 
     
+
 
 
 
