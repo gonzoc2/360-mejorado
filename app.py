@@ -1994,7 +1994,7 @@ else:
                 seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, "GASTOS FINANCIEROS")
                 seccion_analisis_especial_porcentual(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, oh, "OH")
 
-
+    
     elif selected == "Proyeccion":
         st.write("Bienvenido a la sección de Proyección. Aquí puedes ver las proyecciones de los proyectos.")
 
@@ -2016,7 +2016,8 @@ else:
         if ingreso_lineal:
             st.write("Proyección lineal")
             df_ing_futu = df_2025[df_2025["Mes_A"] == mes_act]
-            df_ing_futu = df_ing_futu[df_ing_futu["Proyecto_A"].isin(codigo_pro)]
+            if pro != "ESGARI":
+                df_ing_futu = df_ing_futu[df_ing_futu["Proyecto_A"].isin(codigo_pro)]
             df_ing_futu = df_ing_futu[df_ing_futu["Categoria_A"] == "INGRESO"]
             ingreso_pro_fut = df_ing_futu["Neto_A"].sum() / fecha_act * ultimo_dia_mes
         else:
@@ -2056,7 +2057,8 @@ else:
             
             df_ext = df_2025[df_2025["Mes_A"] == mes_ant]
             df_ext = df_ext[~(df_ext["Categoria_A"].isin(costos_variables))]
-            df_ext = df_ext[df_ext["Proyecto_A"].isin(codigo_pro)]
+            if pro != "ESGARI":
+                df_ext = df_ext[df_ext["Proyecto_A"].isin(codigo_pro)]
             df_ext = df_ext[~df_ext["Proyecto_A"].isin(["8002", "8003", "8004"])]
             df_ext["Mes_A"] = mes_act
             df_ext["Neto_A"] = df_ext["Neto_A"]
@@ -2068,7 +2070,8 @@ else:
 
             df_ext = df_2025[df_2025["Mes_A"] != mes_act]
             df_ext = df_ext[~(df_ext["Categoria_A"].isin(costos_variables))]
-            df_ext = df_ext[df_ext["Proyecto_A"].isin(codigo_pro)]
+            if pro != "ESGARI":
+                df_ext = df_ext[df_ext["Proyecto_A"].isin(codigo_pro)]
             df_ext = df_ext[~df_ext["Proyecto_A"].isin(["8002", "8003", "8004"])]
             numero_meses = df_ext['Mes_A'].nunique()
 
@@ -2094,7 +2097,8 @@ else:
             # Filtramos gastos fijos (no variables) de los 3 meses anteriores
             df_ext = df_2025[df_2025["Mes_A"].isin(meses_previos)]
             df_ext = df_ext[~(df_ext["Categoria_A"].isin(costos_variables))]
-            df_ext = df_ext[df_ext["Proyecto_A"].isin(codigo_pro)]
+            if pro != "ESGARI":
+                df_ext = df_ext[df_ext["Proyecto_A"].isin(codigo_pro)]
             df_ext = df_ext[~df_ext["Proyecto_A"].isin(["8002", "8003", "8004"])]
 
             numero_meses = df_ext['Mes_A'].nunique()  # Seguridad por si faltan meses
@@ -2121,7 +2125,8 @@ else:
         if promedio_variables == "Mes actual":
             df_ext_var = df_2025[df_2025["Mes_A"] == mes_act]
             df_ext_var = df_ext_var[df_ext_var["Categoria_A"].isin(costos_variables)]
-            df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
+            if pro != "ESGARI":
+                df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
             
             ingreso_pro = df_ext_var[df_ext_var["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
             df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
@@ -2149,7 +2154,8 @@ else:
         elif promedio_variables == "LM":
             df_ext_var = df_2025[df_2025["Mes_A"] == mes_ant]
             df_ext_var = df_ext_var[df_ext_var["Categoria_A"].isin(costos_variables)]
-            df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
+            if pro != "ESGARI":
+                df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
             ingreso_pro = df_ext_var[df_ext_var["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
             df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
             df_ext_var = df_ext_var[~df_ext_var["Categoria_A"].isin(["INGRESO"])]
@@ -2180,7 +2186,8 @@ else:
         elif promedio_variables == "YTD":
             df_ext_var = df_2025[df_2025["Mes_A"] != mes_act]
             df_ext_var = df_ext_var[df_ext_var["Categoria_A"].isin(costos_variables)]
-            df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
+            if pro != "ESGARI":
+                df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
             ingreso_pro = df_ext_var[df_ext_var["Categoria_A"] == "INGRESO"]["Neto_A"].sum()
             df_ext_var["Neto_normalizado"] = df_ext_var["Neto_A"] / ingreso_pro
             df_ext_var = df_ext_var[~df_ext_var["Categoria_A"].isin(["INGRESO"])]
@@ -2215,7 +2222,8 @@ else:
             # Filtramos gastos variables de los 3 meses anteriores
             df_ext_var = df_2025[df_2025["Mes_A"].isin(meses_previos)]
             df_ext_var = df_ext_var[df_ext_var["Categoria_A"].isin(costos_variables)]
-            df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
+            if pro != "ESGARI":
+                df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
             numero_meses = df_ext_var['Mes_A'].nunique()
             if numero_meses > 0:
 
@@ -3366,3 +3374,4 @@ else:
             mostrar_tabla_estilizada(df_resultado, id=93)
 
     
+
