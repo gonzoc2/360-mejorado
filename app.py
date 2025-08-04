@@ -3043,6 +3043,7 @@ else:
         if not df_result.empty:
             # Gráfico combinado
             st.subheader("📈 Evolución de Ratios")
+            df_result["Ratio_label"] = df_result["Ratio"].apply(lambda x: f"{x:,.2f}")
             fig = px.line(
                 df_result,
                 x="Mes",
@@ -3050,8 +3051,10 @@ else:
                 color="Nombre",
                 line_dash="Proyecto",
                 markers=True,
+                text="Ratio_label",
                 title="Ratios por mes y proyecto"
             )
+
             fig.update_layout(
                 height=500,
                 legend_title="Ratio",
@@ -3374,4 +3377,5 @@ else:
             mostrar_tabla_estilizada(df_resultado, id=93)
 
     
+
 
