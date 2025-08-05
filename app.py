@@ -1341,7 +1341,7 @@ else:
     if st.session_state["rol"] in ["director", "admin"] and "ESGARI" in st.session_state["proyectos"]:
         selected = option_menu(
         menu_title=None,
-        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios", "Dashboard", "Benchmark", "Simulador"],
+        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios", "Dashboard", "Benchmark", "Simulador", "Gastos por Empresa"],
         icons = [
                 "house",                # Resumen
                 "clipboard-data",       # Estado de Resultado
@@ -1353,10 +1353,11 @@ else:
                 "calendar",             # Meses
                 "graph-up",             # Mes Corregido
                 "person-gear",          # CeCo -> "Centro de Costos"
-                "percent",               # Ratios
+                "percent",              # Ratios
                 "speedometer" ,         # Dashboard
                 "trophy",
                 "sliders",
+                "dollar",
             ],
         default_index=0,
         orientation="horizontal",)
@@ -3377,6 +3378,119 @@ else:
             mostrar_tabla_estilizada(df_resultado, id=93)
 
     
+    elif selected == "Gastos por Empresa":
+        ct("GASTO POR EMPRESA")
+        empresas = [0, 10, 20, 30, 40, 50]
+        nombre_empresas = [
+            'ESGARI',
+            'ESGARI HOLDING MEXICO, S.A. DE C.V.',
+            'RESA MULTIMODAL, S.A. DE C.V', 
+            'UBIKARGA S.A DE C.V', 
+            'ESGARI FORWARDING SA DE CV', 
+            'ESGARI WAREHOUSING & MANUFACTURING, S DE R.L DE C.V'
+        ]
+        empresas_dict = dict(zip(nombre_empresas, empresas))
+        col1, col2 = st.columns(2)
+
+        def filtro_emp(col):
+            emp = col.selectbox('Selecciona la empresa', empresas_dict)
+            if emp == 'ESGARI':
+                codigo_emp = empresas
+            else:
+                codigo_emp = [empresas_dict[emp]]
+            return emp, codigo_emp
+
+        emp, codigo_emp = filtro_emp(col1)
+        meses = filtro_meses(col2, df_2025)
+
+        df_emp = df_2025[
+            (df_2025["Mes_A"].isin(meses)) &
+            (df_2025["Empresa_A"].isin(codigo_emp)) &
+            (~df_2025["Clasificacion_A"].isin(["INGRESO", "IMPUESTOS", "OTROS INGRESOS"]))
+        ]
+
+        df_emp = df_emp.groupby(
+            ["Clasificacion_A", "Categoria_A", "Cuenta_Nombre_A", "Mes_A"],
+            as_index=False
+        )["Neto_A"].sum()
+
+        df_pivot = df_emp.pivot_table(
+            index=["Clasificacion_A", "Categoria_A", "Cuenta_Nombre_A"],
+            columns="Mes_A",
+            values="Neto_A",
+            aggfunc="sum",
+            fill_value=0
+        ).reset_index()
+
+        # Ordenar columnas de meses cronológicamente
+        meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", 
+                        "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+
+        # Filtrar solo los meses seleccionados que existen en los datos
+        columnas_meses = [m for m in meses_ordenados if m in df_pivot.columns]
+
+        # Reordenar columnas
+        df_pivot = df_pivot[["Clasificacion_A", "Categoria_A", "Cuenta_Nombre_A"] + columnas_meses]
+
+        # Añadir Total y Promedio al final
+        df_pivot["Total"] = df_pivot[columnas_meses].sum(axis=1)
+        df_pivot["Promedio"] = df_pivot[columnas_meses].mean(axis=1)
+
+
+        df_pivot["Total"] = df_pivot[meses].sum(axis=1)
+        df_pivot["Promedio"] = df_pivot[meses].mean(axis=1)
+
+        gb = GridOptionsBuilder.from_dataframe(df_pivot)
+        gb.configure_column("Clasificacion_A", rowGroup=True, hide=True)
+        gb.configure_column("Categoria_A", rowGroup=True, hide=True)
+        gb.configure_column("Cuenta_Nombre_A", pinned="left")
+
+        formatter = JsCode("""
+            function(params) {
+                if (params.value === 0 || params.value === null) {
+                    return "$0.00";
+                }
+                return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(params.value);
+            }
+        """)
+
+        for col in df_pivot.columns:
+            if col not in ["Clasificacion_A", "Categoria_A", "Cuenta_Nombre_A"]:
+                gb.configure_column(
+                    col,
+                    type=["numericColumn"],
+                    aggFunc="sum",
+                    valueFormatter=formatter,
+                    cellStyle={'textAlign': 'right'}
+                )
+
+        gridOptions = gb.build()
+        st.write("### Tabla por Mes con Total y Promedio")
+        AgGrid(
+            df_pivot,
+            gridOptions=gridOptions,
+            enable_enterprise_modules=True,
+            fit_columns_on_grid_load=False,
+            allow_unsafe_jscode=True,
+            domLayout='normal',
+            height=600
+        )
+
+        # Exportar a Excel
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            df_pivot.to_excel(writer, index=False, sheet_name="Gastos_por_empresa")
+            output.seek(0)
+
+        st.download_button(
+            label=f"Descargar tabla",
+            data=output,
+            file_name=f"gastos_{emp}_{'_'.join(meses)}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"_download_gastos_emp"
+        )
+
+
 
 
 
