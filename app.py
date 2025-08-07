@@ -1341,7 +1341,8 @@ else:
     if st.session_state["rol"] in ["director", "admin"] and "ESGARI" in st.session_state["proyectos"]:
         selected = option_menu(
         menu_title=None,
-        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios", "Dashboard", "Benchmark", "Simulador", "Gastos por Empresa"],
+        options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido",
+                 "CeCo", "Ratios", "Dashboard", "Benchmark", "Simulador", "Gastos por Empresa", "Comercial"],
         icons = [
                 "house",                # Resumen
                 "clipboard-data",       # Estado de Resultado
@@ -1364,14 +1365,14 @@ else:
     elif st.session_state["rol"] == "director" or st.session_state["rol"] == "admin":
         selected = option_menu(
         menu_title=None,
-        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo"],
-        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar", "graph-up", "person-gear"],
+        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios", "Comercial"],
+        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar", "graph-up", "person-gear", "percent"],
         default_index=0,
         orientation="horizontal",)
     elif st.session_state["rol"] == "gerente":
         selected = option_menu(
         menu_title=None,
-        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo"],
+        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Comercial"],
         icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "graph-up", "person-gear"],
         default_index=0,
         orientation="horizontal",)
@@ -1382,6 +1383,13 @@ else:
         icons=["person-gear"],
         default_index=0,
         orientation="horizontal",)
+    elif st.session_state["rol"] == "comercial":
+        selected = option_menu(
+        menu_title=None,
+        options=[ "Comercial"],
+        icons=["bar-chart"],
+        default_index=0,
+        orientation="horizontal",)   
 
 
 
@@ -3489,6 +3497,78 @@ else:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"_download_gastos_emp"
         )
+
+    elif selected == "Comercial":
+        ct("Ingresos")
+        codi_pro, nom_pro = filtro_pro(st)
+        def ingre_co(df):
+            
+            if nom_pro != "ESGARI":
+                df = df[df["Proyecto_A"].isin(codi_pro)]
+            df = df[df["Categoria_A"] == "INGRESO"]
+            df = df.groupby("Mes_A", as_index=False).agg({"Neto_A": "sum"})
+            return df
+
+        df_co_2025 = ingre_co(df_2025)
+        df_co_ly = ingre_co(df_ly)
+        df_co_ppt = ingre_co(df_ppt)
+
+        # Asegurar que todos los meses estén presentes
+        orden_meses = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
+                    "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+        df_base = pd.DataFrame({"Mes_A": orden_meses})
+
+        # Unir los ingresos con todos los meses disponibles
+        def asegurar_meses(df, col_name):
+            df = df_base.merge(df, on="Mes_A", how="left")
+            df.rename(columns={"Neto_A": col_name}, inplace=True)
+            return df
+
+        df_co_2025 = asegurar_meses(df_co_2025, "Actual")
+        df_co_ly = asegurar_meses(df_co_ly, "Año Anterior")
+        df_co_ppt = asegurar_meses(df_co_ppt, "Presupuesto")
+
+        # Unir todas las series
+        df_final = df_base.copy()
+        df_final = df_final.merge(df_co_2025, on="Mes_A", how="left")
+        df_final = df_final.merge(df_co_ly, on="Mes_A", how="left")
+        df_final = df_final.merge(df_co_ppt, on="Mes_A", how="left")
+
+        # Convertir a formato largo
+        df_melted = df_final.melt(id_vars="Mes_A", var_name="Tipo", value_name="Ingresos")
+
+        # Convertir a miles y redondear sin decimales
+        df_melted["Ingresos_miles"] = (df_melted["Ingresos"] / 1000).round(0)
+
+        # Crear etiquetas separadas por fila (solo si no es NaN)
+        df_melted["Texto"] = df_melted["Ingresos_miles"].apply(
+            lambda x: f"${int(x):,}" if pd.notnull(x) else ""
+        )
+
+        # Crear gráfico con trazas separadas por tipo
+        fig = px.line(
+            df_melted,
+            x="Mes_A",
+            y="Ingresos_miles",
+            color="Tipo",
+            markers=True,
+            title="Ingresos Comerciales por Mes (en miles de $)"
+        )
+
+        # Asignar etiquetas por traza correctamente
+        for tipo in df_melted["Tipo"].unique():
+            fig.update_traces(
+                selector=dict(name=tipo),
+                text=df_melted[df_melted["Tipo"] == tipo]["Texto"],
+                textposition="top center",
+                mode="lines+markers+text"
+            )
+
+        # Eje Y en formato monetario
+        fig.update_layout(yaxis_tickformat="$,.0f")
+
+        st.plotly_chart(fig, use_container_width=True)
+
 
 
 
