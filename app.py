@@ -611,11 +611,41 @@ def tabla_comparativa(tipo_com, df_agrid, df_2025, proyecto_codigo, meses_selecc
     fig_var.update_traces(textposition='outside')
 
     st.plotly_chart(fig_var, use_container_width=True)
+    
+ceco = st.secrets["urls"]["ceco"]
+cecos = cargar_datos(ceco)
+def filtro_ceco(col):
+    cecos["ceco"] = cecos["ceco"].astype(str)
+    df_visibles = cecos[cecos["ceco"].isin(st.session_state["cecos"])]
+    # Mapea nombres a códigos (solo los que tiene acceso)
+    nombre_a_codigo = dict(zip(df_visibles["nombre"], df_visibles["ceco"]))
+
+    # Caso especial: si solo tiene acceso a "ESGARI"
+    if st.session_state["cecos"] == ["ESGARI"]:
+        opciones = ["ESGARI"] + cecos["nombre"].tolist()
+        ceco_nombre = col.selectbox("Selecciona un ceco", opciones)
+
+        if ceco_nombre == "ESGARI":
+            ceco_codigo = cecos["ceco"].tolist()  # Accede a todos
+
+        else:
+            # Buscar código del nombre elegido
+            ceco_codigo = cecos[cecos["nombre"] == ceco_nombre]["ceco"].values.tolist()
+    else:
+        # Normal: mostrar solo nombres permitidos
+        ceco_nombre = col.selectbox("Selecciona un ceco", list(nombre_a_codigo.keys()))
+        ceco_codigo = [nombre_a_codigo[ceco_nombre]]
+
+    return ceco_codigo, ceco_nombre
 
 def estdo_re(df_2025, ceco):
     col1, col2 = st.columns(2)
     meses_seleccionado = filtro_meses(col1, df_2025)
     proyecto_codigo, proyecto_nombre = filtro_pro(col2)
+    codi_ceco , nombre_ceco = filtro_ceco(st)
+    df_2025["CeCo_A"] = df_2025["CeCo_A"].astype(str)
+    if nombre_ceco != "ESGARI":
+        df_2025 = df_2025[df_2025["CeCo_A"].isin(codi_ceco)]
     if not meses_seleccionado:
             st.error("Favor de seleccionar por lo menos un mes")
     else:
@@ -2792,31 +2822,7 @@ else:
     elif selected == "CeCo":
         import altair as alt
         texto_centrado("GASTOS POR CECO")
-        ceco = 'https://docs.google.com/spreadsheets/d/1erAeeqsJKz9e9JFCJFGtGqSMLaF9s3dPEMqiteXhCD0/export?format=xlsx'
-        cecos = cargar_datos(ceco)
-        def filtro_ceco(col):
-            cecos["ceco"] = cecos["ceco"].astype(str)
-            df_visibles = cecos[cecos["ceco"].isin(st.session_state["cecos"])]
-            # Mapea nombres a códigos (solo los que tiene acceso)
-            nombre_a_codigo = dict(zip(df_visibles["nombre"], df_visibles["ceco"]))
 
-            # Caso especial: si solo tiene acceso a "ESGARI"
-            if st.session_state["cecos"] == ["ESGARI"]:
-                opciones = ["ESGARI"] + cecos["nombre"].tolist()
-                ceco_nombre = col.selectbox("Selecciona un ceco", opciones)
-
-                if ceco_nombre == "ESGARI":
-                    ceco_codigo = cecos["ceco"].tolist()  # Accede a todos
-
-                else:
-                    # Buscar código del nombre elegido
-                    ceco_codigo = cecos[cecos["nombre"] == ceco_nombre]["ceco"].values.tolist()
-            else:
-                # Normal: mostrar solo nombres permitidos
-                ceco_nombre = col.selectbox("Selecciona un ceco", list(nombre_a_codigo.keys()))
-                ceco_codigo = [nombre_a_codigo[ceco_nombre]]
-
-            return ceco_codigo, ceco_nombre
         col1, col2 = st.columns(2)
         ceco_codigo, ceco_nombre = filtro_ceco(col1)
 
@@ -3568,6 +3574,7 @@ else:
         fig.update_layout(yaxis_tickformat="$,.0f")
 
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
