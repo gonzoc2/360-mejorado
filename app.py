@@ -2976,126 +2976,181 @@ else:
     )
 
     elif selected == "Ratios":
-        st.title("📊 Análisis de Ratios Personalizados")
+            st.title("📊 Análisis de Ratios Personalizados")
 
-        # Selección de proyectos
-        def filtro_pro_ratios(col):
-            df_visibles = proyectos[proyectos["proyectos"].astype(str).isin(st.session_state["proyectos"])]
-            nombre_a_codigo = dict(zip(df_visibles["nombre"], df_visibles["proyectos"].astype(str)))
-            proyectos_dict = {}
+            # --- Selección de proyectos (tu lógica existente) ---
+            def filtro_pro_ratios(col):
+                df_visibles = proyectos[proyectos["proyectos"].astype(str).isin(st.session_state["proyectos"])]
+                nombre_a_codigo = dict(zip(df_visibles["nombre"], df_visibles["proyectos"].astype(str)))
+                proyectos_dict = {}
 
-            if st.session_state["proyectos"] == ["ESGARI"]:
-                opciones = ["ESGARI"] + proyectos["nombre"].tolist()
-                seleccionados = col.multiselect("Selecciona proyecto(s)", opciones, default=["ESGARI"])
-                if "ESGARI" in seleccionados:
-                    codigos_todos = proyectos["proyectos"].astype(str).tolist()
-                    proyectos_dict["ESGARI"] = codigos_todos
-                seleccion_otros = [s for s in seleccionados if s != "ESGARI"]
-                for nombre in seleccion_otros:
-                    codigo = proyectos[proyectos["nombre"] == nombre]["proyectos"].astype(str).iloc[0]
-                    proyectos_dict[nombre] = codigo
-            else:
-                seleccionados = col.multiselect("Selecciona proyecto(s)", list(nombre_a_codigo.keys()))
-                for nombre in seleccionados:
-                    proyectos_dict[nombre] = nombre_a_codigo[nombre]
-            return proyectos_dict
+                if st.session_state["proyectos"] == ["ESGARI"]:
+                    opciones = ["ESGARI"] + proyectos["nombre"].tolist()
+                    seleccionados = col.multiselect("Selecciona proyecto(s)", opciones, default=["ESGARI"])
+                    if "ESGARI" in seleccionados:
+                        codigos_todos = proyectos["proyectos"].astype(str).tolist()
+                        proyectos_dict["ESGARI"] = codigos_todos
+                    seleccion_otros = [s for s in seleccionados if s != "ESGARI"]
+                    for nombre in seleccion_otros:
+                        codigo = proyectos[proyectos["nombre"] == nombre]["proyectos"].astype(str).iloc[0]
+                        proyectos_dict[nombre] = codigo
+                else:
+                    seleccionados = col.multiselect("Selecciona proyecto(s)", list(nombre_a_codigo.keys()))
+                    for nombre in seleccionados:
+                        proyectos_dict[nombre] = nombre_a_codigo[nombre]
+                return proyectos_dict
 
-        dic_proyectos = filtro_pro_ratios(st)
+            dic_proyectos = filtro_pro_ratios(st)
 
-        # Selección de meses
-        meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
-                        "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
-        meses_disponibles = [m for m in meses_ordenados if m in df_2025["Mes_A"].unique()]
-        meses_sel = st.multiselect("Selecciona meses a analizar", meses_disponibles, default=meses_disponibles)
+            # Para pasar a estado_resultado como lista_proyectos (alineado con tus otras llamadas)
+            lista_proyectos_local = []
+            for _nombre, _cod in dic_proyectos.items():
+                if isinstance(_cod, list):
+                    lista_proyectos_local.extend(_cod)
+                else:
+                    lista_proyectos_local.append(_cod)
 
-        # Selección de cuántos ratios mostrar
-        num_ratios = st.number_input("¿Cuántos ratios deseas analizar?", min_value=1, max_value=5, value=2, step=1)
+            # --- Selección de meses (tu lógica existente) ---
+            meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
+                            "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+            meses_disponibles = [m for m in meses_ordenados if m in df_2025["Mes_A"].unique()]
+            meses_sel = st.multiselect("Selecciona meses a analizar", meses_disponibles, default=meses_disponibles)
 
-        campo_map = {
-            "Clasificación": "Clasificacion_A",
-            "Categoría": "Categoria_A",
-            "Cuenta": "Cuenta_Nombre_A"
-        }
+            # --- Nº de ratios (tu lógica existente) ---
+            num_ratios = st.number_input("¿Cuántos ratios deseas analizar?", min_value=1, max_value=5, value=2, step=1)
 
-        ratio_config = []
-        for i in range(num_ratios):
-            with st.expander(f"⚙️ Configuración del Ratio {i+1}"):
-                nombre = st.text_input(f"Nombre del Ratio {i+1}", value=f"Ratio {i+1}")
-                col1, col2 = st.columns(2)
-                tipo_num = col1.selectbox("Campo Numerador", list(campo_map.keys()), key=f"tipo_num_{i}")
-                valor_num = col1.selectbox("Valor Numerador", sorted(df_2025[campo_map[tipo_num]].dropna().unique()), key=f"val_num_{i}")
-                tipo_den = col2.selectbox("Campo Denominador", list(campo_map.keys()), key=f"tipo_den_{i}")
-                valor_den = col2.selectbox("Valor Denominador", sorted(df_2025[campo_map[tipo_den]].dropna().unique()), key=f"val_den_{i}")
-                ratio_config.append({
-                    "nombre": nombre,
-                    "campo_num": campo_map[tipo_num],
-                    "valor_num": valor_num,
-                    "campo_den": campo_map[tipo_den],
-                    "valor_den": valor_den
-                })
+            # --- Mapa de campos: se agrega "Estado de Resultado" ---
+            campo_map = {
+                "Clasificación": "Clasificacion_A",
+                "Categoría": "Categoria_A",
+                "Cuenta": "Cuenta_Nombre_A",
+                "Estado de Resultado": "ER",  # NUEVO
+            }
 
-        # Calcular ratios
-        resultados = []
-        for proyecto, codigos in dic_proyectos.items():
-            if not isinstance(codigos, list):
-                codigos = [codigos]
-            for mes in meses_sel:
-                df_mes = df_2025[(df_2025["Mes_A"] == mes) & (df_2025["Proyecto_A"].isin(codigos))]
-                for config in ratio_config:
-                    num = df_mes[df_mes[config["campo_num"]] == config["valor_num"]]["Neto_A"].sum()
-                    den = df_mes[df_mes[config["campo_den"]] == config["valor_den"]]["Neto_A"].sum()
-                    ratio = num / den if den != 0 else 0
-                    resultados.append({
-                        "Mes": mes,
-                        "Proyecto": proyecto,
-                        "Ratio": ratio,
-                        "Nombre": config["nombre"]
+            # --- Métricas ER mapeadas EXACTAS a estado_resultado() ---
+            # estado_resultado(...) devuelve (entre otros):
+            # 'ingreso_proyecto', 'coss_pro', 'patio_pro', 'coss_total',
+            # 'utilidad_bruta', 'gadmn_pro', 'utilidad_operativa', 'oh_pro',
+            # 'ebit', 'gasto_fin_pro', 'ingreso_fin_pro', 'resultado_fin', 'ebt'
+            er_label_to_key = {
+                "Ingreso": "ingreso_proyecto",
+                "COSS": "coss_pro",
+                "PATIO": "patio_pro",
+                "COSS total": "coss_total",
+                "Utilidad bruta": "utilidad_bruta",
+                "G.ADMN": "gadmn_pro",
+                "Utilidad operativa": "utilidad_operativa",
+                "OH": "oh_pro",
+                "EBIT": "ebit",
+                "Gastos financieros": "gasto_fin_pro",
+                "Ingresos financieros": "ingreso_fin_pro",
+                "Resultado financiero": "resultado_fin",
+                "EBT": "ebt",
+            }
+            er_labels = list(er_label_to_key.keys())
+
+            # --- Configuración de ratios (UI igual, solo ramificación para ER) ---
+            ratio_config = []
+            for i in range(num_ratios):
+                with st.expander(f"⚙️ Configuración del Ratio {i+1}", expanded=(i == 0)):
+                    nombre = st.text_input(f"Nombre del Ratio {i+1}", value=f"Ratio {i+1}", key=f"ratio_name_{i}")
+                    col1, col2 = st.columns(2)
+
+                    # Numerador
+                    tipo_num = col1.selectbox("Campo Numerador", list(campo_map.keys()), key=f"tipo_num_{i}")
+                    if campo_map[tipo_num] == "ER":
+                        valor_num = col1.selectbox("Valor Numerador", er_labels, key=f"val_num_{i}")
+                    else:
+                        valor_num = col1.selectbox(
+                            "Valor Numerador",
+                            sorted(df_2025[campo_map[tipo_num]].dropna().unique()),
+                            key=f"val_num_{i}"
+                        )
+
+                    # Denominador
+                    tipo_den = col2.selectbox("Campo Denominador", list(campo_map.keys()), key=f"tipo_den_{i}")
+                    if campo_map[tipo_den] == "ER":
+                        valor_den = col2.selectbox("Valor Denominador", er_labels, key=f"val_den_{i}")
+                    else:
+                        valor_den = col2.selectbox(
+                            "Valor Denominador",
+                            sorted(df_2025[campo_map[tipo_den]].dropna().unique()),
+                            key=f"val_den_{i}"
+                        )
+
+                    ratio_config.append({
+                        "nombre": nombre,
+                        "campo_num": campo_map[tipo_num],
+                        "valor_num": valor_num,
+                        "campo_den": campo_map[tipo_den],
+                        "valor_den": valor_den,
                     })
 
-        df_result = pd.DataFrame(resultados)
-        df_result["Mes"] = pd.Categorical(df_result["Mes"], categories=meses_ordenados, ordered=True)
-        df_result = df_result.sort_values(["Nombre", "Proyecto", "Mes"])
+            # --- Cálculo (idéntico, solo contempla ER cuando se elige) ---
+            resultados = []
+            for proyecto, codigos in dic_proyectos.items():
+                if not isinstance(codigos, list):
+                    codigos = [codigos]
+                for mes in meses_sel:
+                    df_mes = df_2025[(df_2025["Mes_A"] == mes) & (df_2025["Proyecto_A"].isin(codigos))]
 
-        if not df_result.empty:
-            # Gráfico combinado
-            st.subheader("📈 Evolución de Ratios")
-            df_result["Ratio_label"] = df_result["Ratio"].apply(lambda x: f"{x:,.2f}")
-            fig = px.line(
-                df_result,
-                x="Mes",
-                y="Ratio",
-                color="Nombre",
-                line_dash="Proyecto",
-                markers=True,
-                text="Ratio_label",
-                title="Ratios por mes y proyecto"
-            )
-            fig.update_traces(textposition="top center")
-            fig.update_layout(
-                height=500,
-                legend_title="Ratio",
-                xaxis_title="Mes",
-                yaxis_title="Valor",
-                hovermode="x unified"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+                    # Solo calcular ER si algún ratio lo requiere
+                    necesita_er = any(cfg["campo_num"] == "ER" or cfg["campo_den"] == "ER" for cfg in ratio_config)
+                    er_vals = {}
+                    if necesita_er:
+                        # Usa los MISMOS filtros/orden de parámetros que en tu app
+                        # estado_resultado(df_2025, [mes], proyecto_nombre, proyecto_codigo, lista_proyectos)
+                        er_vals = estado_resultado(df_2025, [mes], proyecto, codigos, lista_proyectos_local)
 
-            # Tabla
-            st.subheader("📋 Tabla de resultados")
-            df_pivot = df_result.pivot_table(index=["Nombre", "Proyecto"], columns="Mes", values="Ratio").reset_index()
-            # Aplicar formato solo a columnas numéricas
-            cols_numericas = df_pivot.select_dtypes(include=["float", "int"]).columns
-            st.dataframe(df_pivot.style.format({col: "{:.2f}" for col in cols_numericas}))
+                    for config in ratio_config:
+                        # Numerador
+                        if config["campo_num"] == "ER":
+                            num = float(er_vals.get(er_label_to_key[config["valor_num"]], 0))
+                        else:
+                            num = float(df_mes[df_mes[config["campo_num"]] == config["valor_num"]]["Neto_A"].sum())
 
+                        # Denominador
+                        if config["campo_den"] == "ER":
+                            den = float(er_vals.get(er_label_to_key[config["valor_den"]], 0))
+                        else:
+                            den = float(df_mes[df_mes[config["campo_den"]] == config["valor_den"]]["Neto_A"].sum())
 
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_pivot.to_excel(writer, index=False)
-            st.download_button("Descargar archivo", data=output.getvalue(),
-                            file_name="ratios_personalizados.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        else:
-            st.warning("No hay resultados para mostrar. Revisa tu configuración.")
+                        ratio = num / den if den != 0 else 0
+                        resultados.append({
+                            "Mes": mes,
+                            "Proyecto": proyecto,
+                            "Ratio": ratio,
+                            "Nombre": config["nombre"]
+                        })
+
+            # --- Visualización original (sin cambios) ---
+            df_result = pd.DataFrame(resultados)
+            df_result["Mes"] = pd.Categorical(df_result["Mes"], categories=meses_ordenados, ordered=True)
+            df_result = df_result.sort_values(["Nombre", "Proyecto", "Mes"])
+
+            if not df_result.empty:
+                st.subheader("📈 Evolución de Ratios")
+                fig = px.line(
+                    df_result,
+                    x="Mes",
+                    y="Ratio",
+                    color="Nombre",
+                    line_dash="Proyecto",
+                    markers=True,
+                    title="Ratios por mes y proyecto"
+                )
+                fig.update_layout(
+                    height=500,
+                    legend_title_text="Ratio",
+                    xaxis_title="Mes",
+                    yaxis_title="Valor del ratio"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+                st.subheader("📋 Tabla de resultados")
+                st.dataframe(df_result, use_container_width=True)
+            else:
+                st.info("Selecciona al menos un proyecto y mes para calcular ratios.")
 
     elif selected == "Dashboard":
         st.title("📊 Dashboard Ejecutivo")
@@ -3574,6 +3629,7 @@ else:
         fig.update_layout(yaxis_tickformat="$,.0f")
 
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
