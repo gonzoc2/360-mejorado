@@ -3580,8 +3580,71 @@ else:
     elif selected == "Comercial":
         ct("Ingresos")
         codi_pro, nom_pro = filtro_pro(st)
+
+        # ---------- Función reutilizable de proyección ----------
+
+        def calcular_proyeccion_ingresos(
+            df_2025: pd.DataFrame,
+            mes_act: str,
+            fecha_actualizacion: pd.DataFrame,
+            pro: str,
+            codigo_pro,                 # list[str] o str
+            modo: str = "lineal",       # "lineal" | "historico"
+            cargar_datos=None,          # callable(url) -> DataFrame (requerido si modo="historico")
+            ingreso_sem_url: str = None
+        ) -> float:
+            fecha_completa = fecha_actualizacion['fecha'].iloc[0]
+            fecha_act = fecha_completa.day
+            ultimo_dia_mes = (fecha_completa + pd.offsets.MonthEnd(0)).day
+
+            df_mes = df_2025[(df_2025["Mes_A"] == mes_act) & (df_2025["Categoria_A"] == "INGRESO")]
+            if pro != "ESGARI":
+                cods = codigo_pro if isinstance(codigo_pro, list) else [codigo_pro]
+                df_mes = df_mes[df_mes["Proyecto_A"].isin(cods)]
+
+            if modo == "lineal":
+                base = df_mes["Neto_A"].sum()
+                return float(base / max(fecha_act, 1) * ultimo_dia_mes)
+
+            if modo == "historico":
+                if cargar_datos is None or ingreso_sem_url is None:
+                    raise ValueError("Para modo 'historico' debes pasar cargar_datos e ingreso_sem_url.")
+                df_hist = cargar_datos(ingreso_sem_url)
+                df_hist["mes"] = pd.to_datetime(df_hist["fecha"]).dt.day
+                idx = (df_hist['mes'] - fecha_act).abs().idxmin()
+                dia_ref = int(df_hist.loc[idx, 'mes'])
+
+                df_va = df_hist[df_hist['mes'] == dia_ref].copy()
+                df_va["ingreso"] = df_va["ingreso"] / max(dia_ref, 1) * fecha_act
+                df_va = df_va.drop(columns=["mes", "semana", "fecha"])
+
+                df_fin = df_hist[df_hist["semana"] == 4].copy()
+                df_fin = df_fin.drop(columns=["mes", "semana", "fecha"])
+
+                df_merged = pd.merge(df_va, df_fin, on="proyecto", suffixes=("_va", "_fin"))
+                df_merged["ingreso_dividido"] = df_merged["ingreso_va"] / df_merged["ingreso_fin"].replace({0: pd.NA})
+                df_merged = df_merged.replace([pd.NA, pd.NaT, float("inf"), -float("inf")], 0)
+
+                df_proy = (df_2025[df_2025["Mes_A"] == mes_act]
+                        .groupby(["Proyecto_A", "Categoria_A"], as_index=False)["Neto_A"].sum())
+                df_proy = df_proy[df_proy["Categoria_A"] == "INGRESO"].drop(columns=["Categoria_A"])
+
+                df_proy["Proyecto_A"] = df_proy["Proyecto_A"].astype(float)
+                df_proy = pd.merge(df_proy, df_merged, left_on="Proyecto_A", right_on="proyecto", how="left")
+                df_proy["Neto_A"] = df_proy["Neto_A"] / df_proy["ingreso_dividido"].replace({0: pd.NA}).fillna(0)
+
+                df_proy = df_proy.drop(columns=["proyecto", "ingreso_va", "ingreso_fin", "ingreso_dividido"])
+                df_proy["Proyecto_A"] = df_proy["Proyecto_A"].astype(float).astype(int).astype(str)
+
+                if pro == "ESGARI":
+                    return float(df_proy["Neto_A"].sum())
+                cods = codigo_pro if isinstance(codigo_pro, list) else [codigo_pro]
+                return float(df_proy[df_proy["Proyecto_A"].isin(cods)]["Neto_A"].sum())
+
+            raise ValueError("modo debe ser 'lineal' o 'historico'")
+
+        # ---------- Helper para ingresos por mes ----------
         def ingre_co(df):
-            
             if nom_pro != "ESGARI":
                 df = df[df["Proyecto_A"].isin(codi_pro)]
             df = df[df["Categoria_A"] == "INGRESO"]
@@ -3592,39 +3655,78 @@ else:
         df_co_ly = ingre_co(df_ly)
         df_co_ppt = ingre_co(df_ppt)
 
-        # Asegurar que todos los meses estén presentes
+        # ---------- Mes actual (formato "ene.","feb.",...) ----------
         orden_meses = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
                     "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+        mes_map = {1:"ene.", 2:"feb.", 3:"mar.", 4:"abr.", 5:"may.", 6:"jun.",
+                7:"jul.", 8:"ago.", 9:"sep.", 10:"oct.", 11:"nov.", 12:"dic."}
+        fecha_hoy = fecha_actualizacion['fecha'].iloc[0]
+        mes_act = mes_map[int(fecha_hoy.month)]
+
+        # ---------- UI: Real vs Proyección en el mes actual ----------
+        colA, colB = st.columns([1,1])
+        vista_mes_actual = colA.radio(
+            f"Mes actual ({mes_act})",
+            options=["Ver real", "Ver proyección"],
+            horizontal=True,
+            index=0,
+            key="vista_mes_actual_ing"
+        )
+        tipo_proy = None
+        if vista_mes_actual == "Ver proyección":
+            tipo_proy = colB.selectbox(
+                "Tipo de proyección",
+                options=["Lineal", "Histórica"],
+                index=0,
+                key="tipo_proy_ing"
+            )
+
+        # ---------- Asegurar que todos los meses estén presentes ----------
         df_base = pd.DataFrame({"Mes_A": orden_meses})
 
-        # Unir los ingresos con todos los meses disponibles
         def asegurar_meses(df, col_name):
             df = df_base.merge(df, on="Mes_A", how="left")
             df.rename(columns={"Neto_A": col_name}, inplace=True)
             return df
 
         df_co_2025 = asegurar_meses(df_co_2025, "Actual")
-        df_co_ly = asegurar_meses(df_co_ly, "Año Anterior")
-        df_co_ppt = asegurar_meses(df_co_ppt, "Presupuesto")
+        df_co_ly   = asegurar_meses(df_co_ly,   "Año Anterior")
+        df_co_ppt  = asegurar_meses(df_co_ppt,  "Presupuesto")
 
-        # Unir todas las series
+        # ---------- Si se elige proyección, reemplazar SOLO el mes actual en "Actual" ----------
+        ingreso_pro_fut = None
+        if vista_mes_actual == "Ver proyección":
+            modo = "lineal" if tipo_proy == "Lineal" else "historico"
+            ingreso_pro_fut = calcular_proyeccion_ingresos(
+                df_2025=df_2025,
+                mes_act=mes_act,
+                fecha_actualizacion=fecha_actualizacion,
+                pro=nom_pro,
+                codigo_pro=codi_pro,
+                modo=modo,
+                cargar_datos=cargar_datos if modo == "historico" else None,
+                ingreso_sem_url=("https://docs.google.com/spreadsheets/d/14l6QLudSBpqxmfuwRqVxCXzhSFzRL0AqWJqVuIOaFFQ/export?format=xlsx")
+            )
+            # Reemplazo in-place del valor del mes actual en la columna "Actual"
+            df_co_2025.loc[df_co_2025["Mes_A"] == mes_act, "Actual"] = ingreso_pro_fut
+
+        # ---------- Unir todas las series ----------
         df_final = df_base.copy()
         df_final = df_final.merge(df_co_2025, on="Mes_A", how="left")
-        df_final = df_final.merge(df_co_ly, on="Mes_A", how="left")
-        df_final = df_final.merge(df_co_ppt, on="Mes_A", how="left")
+        df_final = df_final.merge(df_co_ly,   on="Mes_A", how="left")
+        df_final = df_final.merge(df_co_ppt,  on="Mes_A", how="left")
 
-        # Convertir a formato largo
+        # ---------- Mostrar métrica del mes actual ----------
+        # Si no hay proyección, muestra el real; si hay proyección, la proyección.
+        valor_mes_actual = df_final.loc[df_final["Mes_A"] == mes_act, "Actual"].values[0]
+        etiqueta = "Ingreso proyectado del mes" if vista_mes_actual == "Ver proyección" else "Ingreso real del mes"
+ 
+
+        # ---------- Gráfico ----------
         df_melted = df_final.melt(id_vars="Mes_A", var_name="Tipo", value_name="Ingresos")
-
-        # Convertir a miles y redondear sin decimales
         df_melted["Ingresos_miles"] = (df_melted["Ingresos"] / 1000).round(0)
+        df_melted["Texto"] = df_melted["Ingresos_miles"].apply(lambda x: f"${int(x):,}" if pd.notnull(x) else "")
 
-        # Crear etiquetas separadas por fila (solo si no es NaN)
-        df_melted["Texto"] = df_melted["Ingresos_miles"].apply(
-            lambda x: f"${int(x):,}" if pd.notnull(x) else ""
-        )
-
-        # Crear gráfico con trazas separadas por tipo
         fig = px.line(
             df_melted,
             x="Mes_A",
@@ -3633,8 +3735,6 @@ else:
             markers=True,
             title="Ingresos Comerciales por Mes (en miles de $)"
         )
-
-        # Asignar etiquetas por traza correctamente
         for tipo in df_melted["Tipo"].unique():
             fig.update_traces(
                 selector=dict(name=tipo),
@@ -3642,11 +3742,9 @@ else:
                 textposition="top center",
                 mode="lines+markers+text"
             )
-
-        # Eje Y en formato monetario
         fig.update_layout(yaxis_tickformat="$,.0f")
-
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
