@@ -761,15 +761,15 @@ def estdo_re(df_2025, ceco):
         ventanas = ['INGRESO', 'COSS', 'G.ADMN', 'GASTOS FINANCIEROS', 'INGRESO FINANCIERO']
         tabs = st.tabs(ventanas)
         with tabs[0]:
-            tabla_expandible(df_2025, "INGRESO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ingresos", ceco)
+            tabla_expandible(df_2025, "INGRESO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ingresos", codi_ceco)
         with tabs[1]:
-            tabla_expandible(df_2025, "COSS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_coss", ceco)
+            tabla_expandible(df_2025, "COSS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_coss", codi_ceco)
         with tabs[2]:
-            tabla_expandible(df_2025, "G.ADMN", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_g.admn", ceco)
+            tabla_expandible(df_2025, "G.ADMN", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_g.admn", codi_ceco)
         with tabs[3]:
-            tabla_expandible(df_2025, "GASTOS FINANCIEROS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_gfin", ceco)
+            tabla_expandible(df_2025, "GASTOS FINANCIEROS", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_gfin", codi_ceco)
         with tabs[4]:
-            tabla_expandible(df_2025, "INGRESO FINANCIERO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ifin", ceco)
+            tabla_expandible(df_2025, "INGRESO FINANCIERO", meses_seleccionado, proyecto_codigo, proyecto_nombre, "estado_resultado_ifin", codi_ceco)
 
         # ====== GRAFICOS ======
         df_numerico = pd.DataFrame([
@@ -3744,6 +3744,7 @@ else:
             )
         fig.update_layout(yaxis_tickformat="$,.0f")
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
