@@ -2303,6 +2303,10 @@ else:
     elif selected == "Meses":
         ct("P&L MES A MES")
         codigo_pro, pro = filtro_pro(st)
+        ceco_codi, ceco_nomb = filtro_ceco(st)
+        df_2025["CeCo_A"] = df_2025["CeCo_A"].astype(str)
+        if ceco_nomb != "ESGARI":
+            df_2025 = df_2025[df_2025["CeCo_A"].isin(ceco_codi)]
         meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
                    "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
 
@@ -3744,6 +3748,7 @@ else:
             )
         fig.update_layout(yaxis_tickformat="$,.0f")
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
