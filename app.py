@@ -2508,6 +2508,11 @@ else:
                 aggfunc="sum"
             )
 
+            for mes in meses_disponibles:
+                if mes not in df_pivot.columns:
+                    df_pivot[mes] = 0
+            
+            # Reordenar columnas según meses_disponibles
             df_pivot = df_pivot[meses_disponibles]
             df_pivot = df_pivot.reset_index().fillna(0)
 
@@ -3748,6 +3753,7 @@ else:
             )
         fig.update_layout(yaxis_tickformat="$,.0f")
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
