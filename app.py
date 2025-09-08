@@ -1139,7 +1139,7 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
     variable = df_ext_var["Neto_normalizado"].sum()
     fijos_uo = df_sum[df_sum["Clasificacion_A"].isin(["G.ADMN", "COSS"])]["Neto_A"].sum() + patio_pro
     fijos_ebt = fijos_uo + oh_pro + intereses
-    ingreso_uo_24 = fijos_uo / (1- variable - .24)
+    ingreso_uo_24 = fijos_uo / (1- variable - .25)
     ingreso_ebt_115 = fijos_ebt / (1 - variable - .115)
     ingreso_ebt_0 = fijos_ebt / (1 - variable)
     
@@ -1199,7 +1199,7 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
         "Utilidad  Minima Esperada (Punto de Equilibrio)",
         "Ingreso Manual",
         "Utilidad esperada",
-        "Utilidad Operativa Objetivo (24%)"
+        "Utilidad Operativa Objetivo (25%)"
     ])
 
     # Tab 1: UO = 24%
@@ -3776,6 +3776,7 @@ else:
             )
         fig.update_layout(yaxis_tickformat="$,.0f")
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
