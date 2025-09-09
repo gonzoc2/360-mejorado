@@ -1135,14 +1135,29 @@ def mostrar_tabla_estilizada(df, id=1):
     st.markdown(html_table, unsafe_allow_html=True)
     descargar_excel(df, nombre_archivo=f"proyeccion{id}.xlsx")
 
-def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro_ori, gadmn_pro_ori):
+def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro_ori, gadmn_pro_ori, oh_pct_elegido=None):
     variable = df_ext_var["Neto_normalizado"].sum()
     fijos_uo = df_sum[df_sum["Clasificacion_A"].isin(["G.ADMN", "COSS"])]["Neto_A"].sum() + patio_pro
-    fijos_ebt = fijos_uo + oh_pro + intereses
-    ingreso_uo_24 = fijos_uo / (1- variable - .25)
-    ingreso_ebt_115 = fijos_ebt / (1 - variable - .115)
-    ingreso_ebt_0 = fijos_ebt / (1 - variable)
-    
+
+    # OH como porcentaje
+    oh_pct = (oh_pct_elegido / 100.0) if oh_pct_elegido is not None else 0.0
+
+    # 👇 Nuevos cálculos de ingreso objetivo según tipo de OH
+    ingreso_uo_24 = fijos_uo / (1 - variable - 0.25)  # No cambia
+
+    if oh_pct_elegido is not None:
+        ingreso_ebt_0 = (fijos_uo + intereses) / (1 - variable - oh_pct)
+        ingreso_ebt_115 = (fijos_uo + intereses) / (1 - variable - 0.115 - oh_pct)
+    else:
+        fijos_ebt = fijos_uo + oh_pro + intereses
+        ingreso_ebt_0 = fijos_ebt / (1 - variable)
+        ingreso_ebt_115 = fijos_ebt / (1 - variable - 0.115)
+
+    def calcular_oh_dinamico(ingreso_obj):
+        if oh_pct_elegido is not None:
+            return ingreso_obj * oh_pct
+        return oh_pro
+
     def construir_tabla(ingreso_obj, coss, gadm, oh, interes, id_tab):
         utilidad_op = ingreso_obj - coss - gadm
         por_util_op = utilidad_op / ingreso_obj if ingreso_obj else 0
@@ -1179,19 +1194,22 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
                 f"{delta:.2%}"
             ]
         })
+
         if st.session_state["rol"] == "gerente":
-            conceptos_ocultos = ["OH", "EBIT", "Intereses", "% EBT", "EBT"]
-            resumen_df = resumen_df[~resumen_df["Concepto"].isin(conceptos_ocultos)]
+            resumen_df = resumen_df[~resumen_df["Concepto"].isin(["OH", "EBIT", "Intereses", "% EBT", "EBT"])]
 
         mostrar_tabla_estilizada(resumen_df, id=id_tab)
-        if st.session_state["rol"] == "gerente":
-            st.bar_chart(pd.DataFrame({
-            "Valor ($)": [ingreso_obj, coss, gadm, utilidad_op],
-        }, index=["Ingresos", "COSS", "GADM", "Util. Operativa"]))
-        else:
-            st.bar_chart(pd.DataFrame({
-                "Valor ($)": [ingreso_obj, coss, gadm, utilidad_op, ebt],
-            }, index=["Ingresos", "COSS", "GADM", "Util. Operativa", "EBT"]))
+
+        valores_bar = [ingreso_obj, coss, gadm, utilidad_op]
+        if st.session_state["rol"] != "gerente":
+            valores_bar.append(ebt)
+
+        st.bar_chart(pd.DataFrame({
+            "Valor ($)": valores_bar,
+        }, index=["Ingresos", "COSS", "GADM", "Util. Operativa"] + ([] if st.session_state["rol"] == "gerente" else ["EBT"])))
+
+        if oh_pct_elegido is not None:
+            st.caption(f"OH calculado como {oh_pct_elegido:.2f}% del ingreso")
 
     # 🧩 Tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -1202,7 +1220,7 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
         "Utilidad Operativa Objetivo (25%)"
     ])
 
-    # Tab 1: UO = 24%
+    # Tab: UO = 25%
     with tab5:
         df_ext_var_24 = df_ext_var.copy()
         df_ext_var_24["Neto_A"] = df_ext_var_24["Neto_normalizado"] * ingreso_uo_24
@@ -1210,10 +1228,11 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
         df_junto = pd.concat([df_ext_var_24, df_sum], ignore_index=True)
         coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
         gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
-        st.write(f"Ingreso necesario para U. Operativa = 24%: **${ingreso_uo_24:,.2f}**")
-        construir_tabla(ingreso_uo_24, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=1)
+        nuevo_oh = calcular_oh_dinamico(ingreso_uo_24)
+        st.write(f"Ingreso necesario para U. Operativa = 25%: **${ingreso_uo_24:,.2f}**")
+        construir_tabla(ingreso_uo_24, coss_pro, gadmn_pro, nuevo_oh, intereses, id_tab=1)
 
-    # Tab 2: EBT = 0
+    # Tab: EBT = 0
     with tab2:
         df_ext_var_0 = df_ext_var.copy()
         df_ext_var_0["Neto_A"] = df_ext_var_0["Neto_normalizado"] * ingreso_ebt_0
@@ -1221,10 +1240,11 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
         df_junto = pd.concat([df_ext_var_0, df_sum], ignore_index=True)
         coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
         gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
+        nuevo_oh = calcular_oh_dinamico(ingreso_ebt_0)
         st.write(f"Ingreso necesario para alcanzar Punto de Equilibrio: **${ingreso_ebt_0:,.2f}**")
-        construir_tabla(ingreso_ebt_0, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=2)
+        construir_tabla(ingreso_ebt_0, coss_pro, gadmn_pro, nuevo_oh, intereses, id_tab=2)
 
-    # Tab 3: ingreso manual
+    # Tab: Ingreso manual
     with tab3:
         ingreso_manual = st.number_input("💰 Ingreso Manual", value=float(ingreso_pro_fut), step=500000.0, format="%.2f")
         df_ext_var_manual = df_ext_var.copy()
@@ -1233,9 +1253,10 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
         df_junto = pd.concat([df_ext_var_manual, df_sum], ignore_index=True)
         coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
         gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
-        construir_tabla(ingreso_manual, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=3)
+        nuevo_oh = calcular_oh_dinamico(ingreso_manual)
+        construir_tabla(ingreso_manual, coss_pro, gadmn_pro, nuevo_oh, intereses, id_tab=3)
 
-    # Tab 4: % EBT = 11.5%
+    # Tab: EBT = 11.5%
     with tab4:
         df_ext_var_115 = df_ext_var.copy()
         df_ext_var_115["Neto_A"] = df_ext_var_115["Neto_normalizado"] * ingreso_ebt_115
@@ -1243,10 +1264,11 @@ def proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_p
         df_junto = pd.concat([df_ext_var_115, df_sum], ignore_index=True)
         coss_pro = df_junto[df_junto["Clasificacion_A"] == "COSS"]["Neto_A"].sum() + patio_pro
         gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
-        st.write(f"Ingreso necesario para Utilidad Esperada: **${ingreso_ebt_115:,.2f}**")
-        construir_tabla(ingreso_ebt_115, coss_pro, gadmn_pro, oh_pro, intereses, id_tab=4)
+        nuevo_oh = calcular_oh_dinamico(ingreso_ebt_115)
+        st.write(f"Ingreso necesario para Utilidad Esperada (EBT 11.5%): **${ingreso_ebt_115:,.2f}**")
+        construir_tabla(ingreso_ebt_115, coss_pro, gadmn_pro, nuevo_oh, intereses, id_tab=4)
 
-    # Tab 5: Original sin ajuste
+    # Tab: Original
     with tab1:
         st.write("Proyección Original")
         construir_tabla(ingreso_pro_fut, coss_pro_ori, gadmn_pro_ori, oh_pro, intereses, id_tab=5)
@@ -2183,6 +2205,89 @@ else:
 
             else:
                 st.warning("No hay suficientes meses anteriores para calcular el promedio de 3 meses.")
+
+
+        # Respalda el cálculo original que ya tienes
+        oh_pro_monto = locals().get("oh_pro", 0.0)  # si aún no existe, cae en 0.0
+
+        col_modo, col_dummy = st.columns([2, 1])
+        modo_oh_master = col_modo.selectbox(
+            "Modo de cálculo de Overhead (OH)",
+            ["Usar cálculo original (monto)", "Calcular como % de ingresos"],
+            index=0  # default: respeta tu cálculo actual
+        )
+
+        # Helpers de rango de meses
+        def meses_previos_hasta(mes_act, meses_ordenados):
+            idx = meses_ordenados.index(mes_act)
+            return meses_ordenados[:idx]
+
+        def ultimos_tres_meses(mes_act, meses_ordenados):
+            idx = meses_ordenados.index(mes_act)
+            return meses_ordenados[max(0, idx-3):idx]
+
+        # Si eligen % de ingresos, mostramos opciones de periodo y % manual
+        oh_pro_pct = None
+        if modo_oh_master == "Calcular como % de ingresos":
+            col_oh1, col_oh2 = st.columns([2, 1])
+            modo_oh = col_oh1.selectbox(
+                "OH como % de ingresos (elige el periodo base)",
+                ["Manual (fijo)", "Mes pasado (LM)", "Promedio 3 meses", "YTD (año en curso)"],
+                index=0  # default manual
+            )
+            oh_pct_manual = col_oh2.number_input(
+                "OH % (manual)",
+                min_value=0.0, max_value=100.0, value=11.5, step=0.1,
+                help="Porcentaje de OH sobre ingresos cuando el modo es Manual."
+            )
+
+            def calcular_pct_oh_hist(meses_sel, df_base, codigo_pro, pro):
+                if not meses_sel:
+                    return None
+                df_hist = df_base[df_base["Mes_A"].isin(meses_sel)].copy()
+                if pro != "ESGARI":
+                    df_hist = df_hist[df_hist["Proyecto_A"].isin(codigo_pro)]
+                ingreso_hist = df_hist.loc[df_hist["Categoria_A"] == "INGRESO", "Neto_A"].sum()
+                try:
+                    oh_hist = oh(df_base, meses_sel, codigo_pro, pro)
+                except Exception:
+                    oh_hist = 0.0
+                if abs(ingreso_hist) > 1e-9:
+                    return max(0.0, float(oh_hist) / float(ingreso_hist)) * 100.0
+                return None
+
+            # Selección de meses según modo
+            oh_pct_elegido = None
+            if modo_oh == "Manual (fijo)":
+                oh_pct_elegido = oh_pct_manual
+            elif modo_oh == "Mes pasado (LM)":
+                meses_sel = [mes_ant] if mes_ant else []
+                oh_pct_elegido = calcular_pct_oh_hist(meses_sel, df_2025, codigo_pro, pro)
+            elif modo_oh == "Promedio 3 meses":
+                meses_sel = ultimos_tres_meses(mes_act, meses_ordenados)
+                oh_pct_elegido = calcular_pct_oh_hist(meses_sel, df_2025, codigo_pro, pro)
+            elif modo_oh == "YTD (año en curso)":
+                meses_sel = [m for m in meses_previos_hasta(mes_act, meses_ordenados)
+                            if m in df_2025["Mes_A"].unique().tolist()]
+                oh_pct_elegido = calcular_pct_oh_hist(meses_sel, df_2025, codigo_pro, pro)
+
+            # Fallback robusto
+            if oh_pct_elegido is None or not np.isfinite(oh_pct_elegido):
+                st.info("No fue posible estimar el %OH con el histórico seleccionado. Usando 11.5% por defecto.")
+                oh_pct_elegido = 11.5
+
+            # Monto de OH proyectado por % de ingresos
+            oh_pro_pct = ingreso_pro_fut * (oh_pct_elegido / 100.0)
+
+        # --- Resultado final de OH a usar en el resto del flujo ---
+        oh_pro = oh_pro_monto if modo_oh_master == "Usar cálculo original (monto)" else oh_pro_pct
+
+
+
+
+
+
+
         
         if promedio_variables == "Mes actual":
             df_ext_var = df_2025[df_2025["Mes_A"] == mes_act]
@@ -2211,7 +2316,13 @@ else:
             ebt = ebit - intereses
             por_ebt = ebt / ingreso_pro_fut if ingreso_pro_fut != 0 else 0
             
-            proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro)
+            if modo_oh_master == "Calcular como % de ingresos":
+                oh_pct_elegido = oh_pct_elegido  # ya estaba definido arriba
+            else:
+                oh_pct_elegido = None
+
+            proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro, oh_pct_elegido)
+
 
         elif promedio_variables == "LM":
             df_ext_var = df_2025[df_2025["Mes_A"] == mes_ant]
@@ -2243,7 +2354,13 @@ else:
             por_ebt = ebt / ingreso_pro_fut if ingreso_pro_fut != 0 else 0
             
             
-            proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro)
+            if modo_oh_master == "Calcular como % de ingresos":
+                oh_pct_elegido = oh_pct_elegido  # ya estaba definido arriba
+            else:
+                oh_pct_elegido = None
+
+            proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro, oh_pct_elegido)
+
 
         elif promedio_variables == "YTD":
             df_ext_var = df_2025[df_2025["Mes_A"] != mes_act]
@@ -2274,7 +2391,13 @@ else:
             por_ebt = ebt / ingreso_pro_fut if ingreso_pro_fut != 0 else 0
             
             
-            proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro)
+            if modo_oh_master == "Calcular como % de ingresos":
+                oh_pct_elegido = oh_pct_elegido  # ya estaba definido arriba
+            else:
+                oh_pct_elegido = None
+
+            proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro, oh_pct_elegido)
+
             
         elif promedio_variables == "TRES MESES":
             # Identificamos los 3 meses anteriores al mes actual
@@ -2306,10 +2429,17 @@ else:
                 ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
                 intereses = df_junto[df_junto["Clasificacion_A"] == "GASTOS FINANCIEROS"]["Neto_A"].sum() - df_junto[df_junto["Categoria_A"].isin(ingreso_fin_cue)]["Neto_A"].sum()
 
-                proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro)
+                if modo_oh_master == "Calcular como % de ingresos":
+                    oh_pct_elegido = oh_pct_elegido  # ya estaba definido arriba
+                else:
+                    oh_pct_elegido = None
+
+                proyecciones(ingreso_pro_fut, df_ext_var, df_sum, oh_pro, intereses, patio_pro, coss_pro, gadmn_pro, oh_pct_elegido)
+
 
             else:
-                st.warning("No hay suficientes meses anteriores para calcular el promedio de 3 meses.")
+                st.warning("No hay suficientes meses anteriores para calcular el promedio de 3 meses.")  
+
     
     
     
@@ -3776,6 +3906,7 @@ else:
             )
         fig.update_layout(yaxis_tickformat="$,.0f")
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
