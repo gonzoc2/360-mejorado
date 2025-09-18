@@ -1347,7 +1347,7 @@ else:
         for key in ["logged_in", "username", "rol", "proyectos"]:
             st.session_state[key] = "" if key != "logged_in" else False
         st.rerun()
-    if st.session_state['username'] == "gonza" or st.session_state['username'] == "Octavio":
+    if st.session_state['rol'] == "admin":
         if st.sidebar.button("🔄 Recargar datos"):
             st.cache_data.clear()
             st.rerun()
@@ -3906,6 +3906,7 @@ else:
             )
         fig.update_layout(yaxis_tickformat="$,.0f")
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
