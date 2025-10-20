@@ -2987,16 +2987,20 @@ else:
 
         col1, col2 = st.columns(2)
         ceco_codigo, ceco_nombre = filtro_ceco(col1)
+        proyecto_codigo, proyecto_nombre = filtro_pro(st)
 
         df_cecos = df_2025.copy()
         df_cecos["CeCo_A"] = df_cecos["CeCo_A"].astype(str)
         df_cecos = df_cecos[df_cecos["CeCo_A"].isin(ceco_codigo)]
+        df_cecos = df_cecos[df_cecos["Proyecto_A"].isin(proyecto_codigo)]
         df_cecos_ly = df_ly.copy()
         df_cecos_ly["CeCo_A"] = df_cecos_ly["CeCo_A"].astype(str)
         df_cecos_ly = df_cecos_ly[df_cecos_ly["CeCo_A"].isin(ceco_codigo)]
+        df_cecos_ly = df_cecos_ly[df_cecos_ly["Proyecto_A"].isin(proyecto_codigo)]
         df_cecos_ppt = df_ppt.copy()
         df_cecos_ppt["CeCo_A"] = df_cecos_ppt["CeCo_A"].astype(str)
         df_cecos_ppt = df_cecos_ppt[df_cecos_ppt["CeCo_A"].isin(ceco_codigo)]
+        df_cecos_ppt = df_cecos_ppt[df_cecos_ppt["Proyecto_A"].isin(proyecto_codigo)]
 
         def tabla_expandible_comp(df, df_ly, df_ppt, cat, mes, ceco, key_prefix):
             columnas = ['Cuenta_Nombre_A', 'Categoria_A']
@@ -3071,7 +3075,7 @@ else:
             df_comb_or = pd.concat([df_comb_or, total_cat], ignore_index=True, sort=False)
             AgGrid(df_comb_or, gridOptions=gb.build(), enable_enterprise_modules=True,
                 allow_unsafe_jscode=True, theme="streamlit", height=400,
-                key=f"{key_prefix}_{cat}_{ceco}_{mes}")
+                key=f"{key_prefix}_{cat}_{ceco}_{mes}_{proyecto_codigo}")
 
             df_sin_total = df_comb_or[df_comb_or["Cuenta_Nombre_A"] != ""]
 
@@ -3906,6 +3910,7 @@ else:
             )
         fig.update_layout(yaxis_tickformat="$,.0f")
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
