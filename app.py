@@ -288,7 +288,7 @@ def gasto_fin (df, meses, codigo_pro, pro, lista_proyectos):
     return gasto_fin, mal_clasificados, oh_gasto_fin
 
 def ingreso_fin (df, meses, codigo_pro, pro, lista_proyectos):
-    ing_fin_cat = ["INGRESO POR REVALUACION CAMBIARIA", "INGRESO POR FACTORAJE", "INGRESO POR INTERESES"]
+    ing_fin_cat = ["INGRESO POR REVALUACION CAMBIARIA", "INGRESO POR FACTORAJE", "INGRESOS POR INTERESES"]
     if pro == "ESGARI":
         df_mes = df[df['Mes_A'].isin(meses)]
         df_ingreso_fin = df_mes[df_mes['Categoria_A'].isin(ing_fin_cat)]
@@ -399,7 +399,7 @@ def tabla_expandible(df, cat, mes, pro, proyecto_nombre, key_prefix, ceco):
     ingreso_total = estado_resultado(df, mes, proyecto_nombre, pro, list_pro).get("ingreso_proyecto", None)
     columnas = ['Cuenta_Nombre_A', 'Categoria_A']
 
-    ingreso_fin = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
+    ingreso_fin = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESOS POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
 
     if not isinstance(pro, list):
         pro = [pro]
@@ -2307,7 +2307,7 @@ else:
             
             gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
 
-            ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
+            ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESOS POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
             intereses = df_junto[df_junto["Clasificacion_A"] == "GASTOS FINANCIEROS"]["Neto_A"].sum() - df_junto[df_junto["Categoria_A"].isin(ingreso_fin_cue)]["Neto_A"].sum()
 
             utilidad_operativa = ingreso_pro_fut - coss_pro - gadmn_pro
@@ -2344,7 +2344,7 @@ else:
             
             gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
 
-            ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
+            ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESOS POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
             intereses = df_junto[df_junto["Clasificacion_A"] == "GASTOS FINANCIEROS"]["Neto_A"].sum() - df_junto[df_junto["Categoria_A"].isin(ingreso_fin_cue)]["Neto_A"].sum()
 
             utilidad_operativa = ingreso_pro_fut - coss_pro - gadmn_pro
@@ -2381,7 +2381,7 @@ else:
             
             gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
 
-            ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
+            ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESOS POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
             intereses = df_junto[df_junto["Clasificacion_A"] == "GASTOS FINANCIEROS"]["Neto_A"].sum() - df_junto[df_junto["Categoria_A"].isin(ingreso_fin_cue)]["Neto_A"].sum()
 
             utilidad_operativa = ingreso_pro_fut - coss_pro - gadmn_pro
@@ -2426,7 +2426,7 @@ else:
                 
                 gadmn_pro = df_junto[df_junto["Clasificacion_A"] == "G.ADMN"]["Neto_A"].sum()
 
-                ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
+                ingreso_fin_cue = ['INGRESO POR REVALUACION CAMBIARIA', 'INGRESOS POR INTERESES', 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE']
                 intereses = df_junto[df_junto["Clasificacion_A"] == "GASTOS FINANCIEROS"]["Neto_A"].sum() - df_junto[df_junto["Categoria_A"].isin(ingreso_fin_cue)]["Neto_A"].sum()
 
                 if modo_oh_master == "Calcular como % de ingresos":
@@ -3005,7 +3005,7 @@ else:
         def tabla_expandible_comp(df, df_ly, df_ppt, cat, mes, ceco, key_prefix):
             columnas = ['Cuenta_Nombre_A', 'Categoria_A']
             ingreso_fin = [
-                'INGRESO POR REVALUACION CAMBIARIA', 'INGRESO POR INTERESES', 
+                'INGRESO POR REVALUACION CAMBIARIA', 'INGRESOS POR INTERESES', 
                 'INGRESO POR REVALUACION DE ACTIVOS', 'INGRESO POR FACTORAJE'
             ]
             # Filtrar según categoría
@@ -3910,6 +3910,7 @@ else:
             )
         fig.update_layout(yaxis_tickformat="$,.0f")
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
