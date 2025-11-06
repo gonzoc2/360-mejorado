@@ -4174,8 +4174,6 @@ else:
 
     elif selected == "Comentarios":
 
-        (bandera)
-
         st.title("Análisis Semanal")
 
         # --- Configuración del enlace del documento ---
@@ -4225,7 +4223,7 @@ else:
                     st.error("❌ No se pudo acceder al documento. Verifica permisos de compartición.")
             except Exception as e:
                 st.error(f"⚠️ Error al cargar el documento: {e}")
-
+                
         # --- Mostrar contenido inicial o recargar cuando se presione el botón ---
         if recargar or "pnl_cargado" not in st.session_state:
             st.session_state["pnl_cargado"] = True
@@ -4234,6 +4232,7 @@ else:
         else:
             # Mostrar contenido actual almacenado (sin recargar)
             placeholder.info("Presiona el botón en la barra lateral para recargar el documento.")
+
 
 
 
