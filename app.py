@@ -1351,7 +1351,7 @@ else:
         if st.sidebar.button("🔄 Recargar datos"):
             st.cache_data.clear()
             st.rerun()
-    if st.session_state["username"] == "gonza" or st.session_state["username"] == "Octavio" or st.session_state["username"] == "Karla" or st.session_state["username"] == "Roman":
+    if st.session_state["username"] == "gonza" or st.session_state["username"] == "Octavio" or st.session_state["username"] == "Karla" or st.session_state["username"] == "Fernanda":
         link_360 = "https://drive.google.com/file/d/1ZQkWXHE9sakW9NL7eUfz8gOh8dg1L5w2/view?usp=sharing"
         def get_direct_link(shareable_link):
             # Extraer el ID del enlace compartido
@@ -1405,7 +1405,7 @@ else:
         selected = option_menu(
         menu_title=None,
         options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido",
-                 "CeCo", "Ratios", "Dashboard", "Benchmark", "Simulador", "Gastos por Empresa", "Comercial"],
+                 "CeCo", "Ratios", "Dashboard", "Benchmark", "Simulador", "Gastos por Empresa", "Comercial","OH"],
         icons = [
                 "house",                # Resumen
                 "clipboard-data",       # Estado de Resultado
@@ -3910,6 +3910,263 @@ else:
             )
         fig.update_layout(yaxis_tickformat="$,.0f")
         st.plotly_chart(fig, use_container_width=True)
+
+    elif selected == "OH":
+
+        import plotly.express as px
+
+        # --- Filtro de CeCo (solo uno a la vez) ---
+        def filtro_ceco(col):
+            cecos_visibles = cecos.copy()
+            cecos_visibles["ceco"] = cecos_visibles["ceco"].astype(str).str.strip()
+            cecos_visibles["nombre"] = cecos_visibles["nombre"].astype(str).str.strip()
+
+            opciones = ["ESGARI"] + sorted(cecos_visibles["nombre"].tolist())
+
+            ceco_seleccionado = col.selectbox(
+                "Selecciona un Centro de Costo (CeCo):", opciones, index=0
+            )
+
+            if ceco_seleccionado == "ESGARI":
+                codigos_ceco = cecos_visibles["ceco"].tolist()
+            else:
+                codigos_ceco = cecos_visibles.loc[
+                    cecos_visibles["nombre"] == ceco_seleccionado, "ceco"
+                ].tolist()
+
+            return ceco_seleccionado, codigos_ceco
+
+
+        # --- Interfaz principal ---
+        st.title("📊 Composición Overhead (OH)")
+        col1, col2 = st.columns(2)
+
+        ceco_seleccionado, lista_cecos_local = filtro_ceco(col2)
+
+        meses = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
+                 "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+
+        # 🔹 Autoselección de meses hasta el último con datos
+        try:
+            df_tmp = df_2025.copy()
+            df_tmp["Mes_A"] = df_tmp["Mes_A"].astype(str).str.strip().str.lower()
+            meses_orden = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
+                           "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+
+            meses_disponibles = [
+                m for m in meses_orden
+                if m.lower() in df_tmp["Mes_A"].unique() and df_tmp.loc[df_tmp["Mes_A"] == m.lower(), "Neto_A"].sum() != 0
+            ]
+
+            if meses_disponibles:
+                ultimo_mes_idx = max(meses_orden.index(m) for m in meses_disponibles)
+                meses_default = meses_orden[:ultimo_mes_idx + 1]
+            else:
+                meses_default = ["ene."]
+
+        except Exception:
+            meses_default = ["ene."]
+
+        meses_seleccionados = col1.multiselect(
+            "Selecciona uno o más meses",
+            meses,
+            default=meses_default
+        )
+
+        tipo_dato = st.selectbox(
+            "Selecciona el tipo de información a mostrar:",
+            options=["OH", "Presupuesto", "LY"]
+        )
+
+
+        # --- Función principal ---
+        def tabla_OH_2(df_2025, df_ppt, df_ly, meses_seleccionados, titulo, codigos_ceco, tipo_dato):
+            st.subheader(titulo)
+
+            # 🔹 Normalización
+            for df in [df_2025, df_ppt, df_ly]:
+                if df is None or df.empty:
+                    continue
+                df.columns = df.columns.str.strip().str.lower()
+                for col in ["mes_a", "proyecto_a", "clasificacion_a", "categoria_a", "cuenta_nombre_a", "ceco_a"]:
+                    if col in df.columns:
+                        df[col] = df[col].astype(str).str.strip().str.lower()
+                if "neto_a" in df.columns:
+                    df["neto_a"] = pd.to_numeric(df["neto_a"], errors="coerce").fillna(0)
+
+            codigos_oh = ["8002", "8004"]
+            clasificaciones_validas = ["coss", "g.admn"]
+            meses_orden = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
+                           "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+            meses_filtrados = [m.lower().strip() for m in meses_seleccionados]
+
+            # --- Filtrar datos ---
+            def filtrar_datos(df):
+                if df is None or df.empty:
+                    return pd.DataFrame()
+                df_filt = df[
+                    (df["mes_a"].isin(meses_filtrados))
+                    & (df["proyecto_a"].isin(codigos_oh))
+                    & (df["clasificacion_a"].isin(clasificaciones_validas))
+                ]
+                if codigos_ceco and "ceco_a" in df.columns:
+                    df_filt = df_filt[df_filt["ceco_a"].isin([c.lower() for c in codigos_ceco])]
+                return df_filt
+
+            df_real = filtrar_datos(df_2025)
+            df_ppt_filt = filtrar_datos(df_ppt)
+            df_ly_filt = filtrar_datos(df_ly)
+
+            if df_real.empty:
+                st.warning("⚠️ No hay datos reales para los filtros seleccionados.")
+                return
+
+            # --- Agregados mensuales ---
+            def resumir(df, nombre_col):
+                if df.empty:
+                    return pd.DataFrame({"mes_a": meses_filtrados, nombre_col: [0] * len(meses_filtrados)})
+                return (
+                    df.groupby("mes_a")["neto_a"]
+                    .sum()
+                    .reindex(meses_filtrados, fill_value=0)
+                    .reset_index()
+                    .rename(columns={"neto_a": nombre_col})
+                )
+
+            resumen_real = resumir(df_real, "OH_Real")
+            resumen_ppt = resumir(df_ppt_filt, "OH_Presupuesto")
+            resumen_ly = resumir(df_ly_filt, "OH_LY")
+
+            tipo = tipo_dato.strip().upper()
+            if tipo in ["OH", "PRESUPUESTO"]:
+                comparativo, col_compara, label_compara = resumen_ppt, "OH_Presupuesto", "Presupuesto (MXN)"
+            elif tipo == "LY":
+                comparativo, col_compara, label_compara = resumen_ly, "OH_LY", "Año Anterior (LY)"
+            else:
+                st.warning("Selecciona 'OH', 'Presupuesto' o 'LY'.")
+                return
+
+            resumen = resumen_real.merge(comparativo, on="mes_a", how="outer").fillna(0)
+            resumen["Diferencia"] = resumen["OH_Real"] - resumen[col_compara]
+            resumen["% Diferencia"] = resumen.apply(
+                lambda x: (x["Diferencia"] / x[col_compara]) if x[col_compara] != 0 else 0, axis=1
+            )
+
+            # --- Tabla principal ---
+            resumen_fmt = resumen.copy()
+            for col in ["OH_Real", col_compara, "Diferencia"]:
+                resumen_fmt[col] = resumen_fmt[col].apply(lambda x: f"${x:,.2f}")
+            resumen_fmt["% Diferencia"] = resumen["% Diferencia"].apply(lambda x: f"{x:.2%}")
+
+            st.dataframe(
+                resumen_fmt.rename(columns={
+                    "mes_a": "Mes",
+                    "OH_Real": "Real (MXN)",
+                    col_compara: label_compara,
+                    "Diferencia": "Diferencia (MXN)",
+                    "% Diferencia": "% Diferencia"
+                })[["Mes", "Real (MXN)", label_compara, "Diferencia (MXN)", "% Diferencia"]],
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # --- Gráfico ---
+            fig = px.bar(
+                resumen,
+                x="mes_a",
+                y=["OH_Real", col_compara],
+                barmode="group",
+                labels={"value": "Monto (MXN)", "variable": "Tipo"},
+                title=f"Comparativa OH ({ceco_seleccionado}): Real vs {label_compara}",
+                height=420
+            )
+            fig.update_traces(texttemplate="%{y:,.0f}", textposition="outside")
+            fig.update_layout(
+                template="plotly_white",
+                xaxis=dict(title="Mes", tickangle=-45, categoryorder='array', categoryarray=meses_orden),
+                yaxis=dict(title="Monto (MXN)", tickformat=","),
+                showlegend=True
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            # --- Expanders: COSS y G.ADMN ---
+            for clasif in ["coss", "g.admn"]:
+                df_clas = df_real[df_real["clasificacion_a"] == clasif]
+                if df_clas.empty:
+                    continue
+
+                with st.expander(f" {clasif.upper()}"):
+
+                    # 🔹 Tabla de totales mensuales por clasificación (orden ene.-dic.)
+                    meses_orden = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.",
+                                   "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
+
+                    df_total = (
+                        df_clas.groupby("mes_a", as_index=False)["neto_a"].sum()
+                    )
+
+                    # Ordenar correctamente los meses
+                    df_total["mes_a"] = pd.Categorical(df_total["mes_a"], categories=[m.lower() for m in meses_orden], ordered=True)
+                    df_total = df_total.sort_values("mes_a")
+
+                    df_total = df_total.set_index("mes_a").T
+                    df_total["TOTAL"] = df_total.sum(axis=1)
+                    df_total.reset_index(inplace=True)
+                    df_total.rename(columns={"index": "Clasificación"}, inplace=True)
+                    df_total["Clasificación"] = clasif.upper()
+
+                    # Formato visual
+                    for col in df_total.columns[1:]:
+                        df_total[col] = df_total[col].apply(lambda x: f"${x:,.2f}")
+
+                    st.dataframe(df_total, use_container_width=True, hide_index=True)
+
+                    # 🔹 Desglose por categoría y cuenta (sin cambios)
+                    df_clas["cuenta_nombre_a"] = df_clas["cuenta_nombre_a"].str.upper()
+                    df_group = (
+                        df_clas.groupby(["categoria_a", "cuenta_nombre_a", "mes_a"], as_index=False)["neto_a"].sum()
+                    )
+                    df_pivot = df_group.pivot_table(
+                        index=["categoria_a", "cuenta_nombre_a"],
+                        columns="mes_a",
+                        values="neto_a",
+                        fill_value=0
+                    )
+                    df_pivot = df_pivot[[m for m in meses if m in df_pivot.columns]]
+                    df_pivot["Total"] = df_pivot.sum(axis=1)
+                    df_pivot.reset_index(inplace=True)
+
+                    filas = []
+                    for cat in df_pivot["categoria_a"].unique():
+                        df_cat = df_pivot[df_pivot["categoria_a"] == cat]
+                        subtotal = df_cat.drop(columns=["categoria_a", "cuenta_nombre_a"]).sum()
+                        filas.append({
+                            "Grupo": cat.upper(),
+                            "Cuenta": "",
+                            **{col: subtotal[col] for col in df_pivot.columns if col not in ["categoria_a", "cuenta_nombre_a"]}
+                        })
+                        for _, row in df_cat.iterrows():
+                            filas.append({
+                                "Grupo": "",
+                                "Cuenta": row["cuenta_nombre_a"],
+                                **{col: row[col] for col in df_pivot.columns if col not in ["categoria_a", "cuenta_nombre_a"]}
+                            })
+                    df_final = pd.DataFrame(filas)
+
+                    for col in df_final.columns:
+                        if col not in ["Grupo", "Cuenta"]:
+                            df_final[col] = df_final[col].apply(lambda x: f"${x:,.2f}")
+
+                    st.dataframe(df_final, use_container_width=True, hide_index=True)
+
+
+        # --- Llamada final ---
+        if meses_seleccionados:
+            titulo = f"OH {tipo_dato}"
+            tabla_OH_2(df_2025, df_ppt, df_ly, meses_seleccionados, titulo, lista_cecos_local, tipo_dato)
+        else:
+            st.warning("⚠️ Debes seleccionar al menos un mes para continuar.")
+
 
 
 
