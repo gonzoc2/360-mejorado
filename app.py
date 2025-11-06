@@ -876,7 +876,7 @@ def estdo_re(df_2025, ceco):
 def texto_centrado(texto):
     st.markdown(f"<div style='text-align: center;'>{texto}</div>", unsafe_allow_html=True)
 
-def seccion__especial_porcentual(df_actual, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, funcion, nombre_funcion):
+def seccion_analisis_especial_porcentual(df_actual, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, funcion, nombre_funcion):
     with st.expander(f"{nombre_funcion.upper()}"):
         # Ingreso actual
         ingreso_total_actual = ingreso(df_actual, meses_seleccionado, proyecto_codigo, proyecto_nombre)
@@ -930,7 +930,7 @@ def seccion__especial_porcentual(df_actual, df_ly, ingreso, meses_seleccionado, 
                 })
         )
 
-def seccion__por_clasificacion(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, clasificacion_nombre):
+def seccion_analisis_por_clasificacion(df_2025, df_ly, ingreso, meses_seleccionado, proyecto_codigo, proyecto_nombre, clasificacion_nombre):
     with st.expander(clasificacion_nombre):
         # Filtrar actuales
         df_actual = df_2025[df_2025['Mes_A'].isin(meses_seleccionado)]
@@ -986,9 +986,9 @@ def seccion__por_clasificacion(df_2025, df_ly, ingreso, meses_seleccionado, proy
         df_histo_categoria = df_histo_categoria.groupby(['Categoria_A','Clasificacion_A']).agg(Media=("Porcentaje %", 'mean'), Desviación_Estándar=("Porcentaje %", 'std')).reset_index()
         df_histo_cuenta = df_histo_cuenta.groupby(["Cuenta_Nombre_A", 'Categoria_A','Clasificacion_A']).agg(Media=("Porcentaje %", 'mean'), Desviación_Estándar=("Porcentaje %", 'std')).reset_index()
 
-        df__junto = pd.concat([df_histo_cuenta, df_histo_categoria], ignore_index=True)
-        df__junto["Limite Inferior"] = df__junto["Media"] - df__junto["Desviación_Estándar"]
-        df__junto["Limite Superior"] = df_analisis_junto["Media"] + df_analisis_junto["Desviación_Estándar"]
+        df_analisis_junto = pd.concat([df_histo_cuenta, df_histo_categoria], ignore_index=True)
+        df_analisis_junto["Limite Inferior"] = df_analisis_junto["Media"] - df_analisis_junto["Desviación_Estándar"]
+        df_analisis_junto["Limite Superior"] = df_analisis_junto["Media"] + df_analisis_junto["Desviación_Estándar"]
         df_analisis_junto = df_analisis_junto[df_analisis_junto["Clasificacion_A"] == clasificacion_nombre].drop(columns=["Clasificacion_A"]).fillna("vacio")
 
         df_analsiis_com = pd.merge(df_analisis_junto, df_actual_junto, on=["Categoria_A", "Cuenta_Nombre_A"], how="left")
@@ -3910,6 +3910,7 @@ else:
             )
         fig.update_layout(yaxis_tickformat="$,.0f")
         st.plotly_chart(fig, use_container_width=True)
+
 
 
 
