@@ -9,6 +9,8 @@ import plotly.express as px
 from plotly import graph_objects as go
 import numpy as np
 from st_aggrid.shared import JsCode
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse, parse_qs
 
 st.set_page_config(
     page_title="Esgari 360",
@@ -1405,7 +1407,7 @@ else:
         selected = option_menu(
         menu_title=None,
         options=["Resumen", "Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido",
-                 "CeCo", "Ratios", "Dashboard", "Benchmark", "Simulador", "Gastos por Empresa", "Comercial","OH"],
+                 "CeCo", "Ratios", "Dashboard", "Benchmark", "Simulador", "Gastos por Empresa", "Comercial", "OH", "Comentarios"],
         icons = [
                 "house",                # Resumen
                 "clipboard-data",       # Estado de Resultado
@@ -1421,22 +1423,25 @@ else:
                 "speedometer" ,         # Dashboard
                 "trophy",
                 "sliders",
-                "dollar",
+                "briefcase",            
+                "currency-dollar",
+                "house-door",
+                "flag",
             ],
         default_index=0,
         orientation="horizontal",)
     elif st.session_state["rol"] == "director" or st.session_state["rol"] == "admin":
         selected = option_menu(
         menu_title=None,
-        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios", "Comercial"],
-        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar", "graph-up", "person-gear", "percent"],
+        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Ratios", "Comercial", "OH", "Comentarios"],
+        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "calendar", "graph-up", "person-gear", "percent", "dcurrency-dollar", "house-door", "flag"],
         default_index=0,
         orientation="horizontal",)
     elif st.session_state["rol"] == "gerente":
         selected = option_menu(
         menu_title=None,
-        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Comercial"],
-        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "graph-up", "person-gear"],
+        options=["Estado de Resultado", "Comparativa", "Análisis", "Proyeccion", "LY", "PPT", "Meses", "Mes Corregido", "CeCo", "Comercial", "Comentarios"],
+        icons=["clipboard-data", "file-earmark-bar-graph", "bar-chart", "building", "clock-history", "easel", "graph-up", "calendar", "person-gear", "currency-dollar", "flag"],
         default_index=0,
         orientation="horizontal",)
     elif st.session_state["rol"] == "ceco":
@@ -1450,7 +1455,7 @@ else:
         selected = option_menu(
         menu_title=None,
         options=[ "Comercial"],
-        icons=["bar-chart"],
+        icons=["currency-dollar"],
         default_index=0,
         orientation="horizontal",)   
 
@@ -4166,6 +4171,69 @@ else:
             tabla_OH_2(df_2025, df_ppt, df_ly, meses_seleccionados, titulo, lista_cecos_local, tipo_dato)
         else:
             st.warning("⚠️ Debes seleccionar al menos un mes para continuar.")
+
+    elif selected == "Comentarios":
+
+        (bandera)
+
+        st.title("Análisis Semanal")
+
+        # --- Configuración del enlace del documento ---
+        url = "https://docs.google.com/document/d/1FlwqzokJW2z_HqUmwrJjQ3xnAFlctUaN/edit?usp=sharing&ouid=101175782095158984544&rtpof=true&sd=true"
+
+        # --- Función para convertir el enlace en formato exportable ---
+        def get_export_link(doc_url: str):
+            """Convierte un enlace de Google Docs en su formato exportable HTML."""
+            try:
+                parsed = urlparse(doc_url)
+                doc_id = parsed.path.split("/d/")[1].split("/")[0]
+                return f"https://docs.google.com/document/d/{doc_id}/export?format=html"
+            except Exception:
+                return None
+
+        # --- Contenedor dinámico para mostrar el contenido ---
+        placeholder = st.empty()
+
+        with st.sidebar:
+            recargar = st.button("📥 Actualizar contenido", use_container_width=True)
+
+        # --- Función para obtener y mostrar el contenido del documento ---
+        def mostrar_documento():
+            export_link = get_export_link(url)
+            if not export_link:
+                st.warning("⚠️ Enlace inválido o mal formateado.")
+                return
+
+            try:
+                response = requests.get(export_link)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, "html.parser")
+
+                    with placeholder.container():
+                        for element in soup.find_all(["h1", "h2", "h3", "h4", "h5", "p", "ul", "ol", "li", "img"]):
+                            if element.name.startswith("h"):
+                                st.markdown(f"## {element.get_text(strip=True)}")
+                            elif element.name in ["p", "li"]:
+                                texto = element.get_text(strip=True)
+                                if texto:
+                                    st.write(texto)
+                            elif element.name == "img":
+                                img_src = element.get("src")
+                                if img_src:
+                                    st.image(img_src, use_container_width=True)
+                else:
+                    st.error("❌ No se pudo acceder al documento. Verifica permisos de compartición.")
+            except Exception as e:
+                st.error(f"⚠️ Error al cargar el documento: {e}")
+
+        # --- Mostrar contenido inicial o recargar cuando se presione el botón ---
+        if recargar or "pnl_cargado" not in st.session_state:
+            st.session_state["pnl_cargado"] = True
+            placeholder.empty()  # limpia contenido anterior
+            mostrar_documento()
+        else:
+            # Mostrar contenido actual almacenado (sin recargar)
+            placeholder.info("Presiona el botón en la barra lateral para recargar el documento.")
 
 
 
