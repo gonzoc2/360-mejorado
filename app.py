@@ -2086,22 +2086,31 @@ else:
     
     elif selected == "Proyeccion":
         st.write("Bienvenido a la sección de Proyección. Aquí puedes ver las proyecciones de los proyectos.")
-
         costos_variables = ["FLETES", "CASETAS", "COMBUSTIBLE", "OTROS COSS", "INGRESO"]
+
         col1, col2 = st.columns(2)
         promedio_fijo = col1.selectbox("Seleciona que promedio usar para los gastos fijos", ["LM", "YTD", "TRES MESES"])
         promedio_variables = col2.selectbox("Seleciona que promedio usar para los gastos variables", ["Mes actual","LM", "YTD", "TRES MESES"])
+
         meses_ordenados = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."]
-        meses_disponibles = [mes for mes in meses_ordenados if mes in df_2025["Mes_A"].unique()]
-        mes_ant = meses_disponibles[-2] if meses_disponibles else None
-        mes_act = meses_disponibles[-1] if meses_disponibles else None
+
+        # ✅ Fecha y meses (una sola vez)
+        fecha_completa = pd.to_datetime(fecha_actualizacion["fecha"].iloc[0])
+        fecha_act = fecha_completa.day
+        ultimo_dia_mes = (fecha_completa + pd.offsets.MonthEnd(0)).day
+
+        idx_mes_act = fecha_completa.month - 1
+        mes_act = meses_ordenados[idx_mes_act]                 # mes actual (según fecha real)
+        mes_ant_lm = meses_ordenados[(idx_mes_act - 1) % 12]   # LM (mes anterior circular)
+
+        # Filtros
         df_mes = df_2025[df_2025["Mes_A"] == mes_act]
         mes = filtro_meses(col1, df_mes)
         codigo_pro, pro = filtro_pro(col2)
-        fecha_act = fecha_actualizacion['fecha'].iloc[0].day
-        fecha_completa = fecha_actualizacion['fecha'].iloc[0]
-        ultimo_dia_mes = (fecha_completa + pd.offsets.MonthEnd(0)).day
+
+        # Toggle ingresos
         ingreso_lineal = st.toggle("ingreso lineal / ingreso por historico", value=True)
+
         if ingreso_lineal:
             st.write("Proyección lineal")
             df_ing_futu = df_2025[df_2025["Mes_A"] == mes_act]
@@ -2109,19 +2118,22 @@ else:
                 df_ing_futu = df_ing_futu[df_ing_futu["Proyecto_A"].isin(codigo_pro)]
             df_ing_futu = df_ing_futu[df_ing_futu["Categoria_A"] == "INGRESO"]
             ingreso_pro_fut = df_ing_futu["Neto_A"].sum() / fecha_act * ultimo_dia_mes
+
         else:
             st.write("Proyección con historicos")
             ingreso_sem = "https://docs.google.com/spreadsheets/d/14l6QLudSBpqxmfuwRqVxCXzhSFzRL0AqWJqVuIOaFFQ/export?format=xlsx"
             df = cargar_datos(ingreso_sem)
             df["mes"] = pd.to_datetime(df["fecha"]).dt.day
-            indice_mas_cercano = (df['mes'] - fecha_act).abs().idxmin()
-            valor_mas_cercano = df.loc[indice_mas_cercano, 'mes']
+            indice_mas_cercano = (df["mes"] - fecha_act).abs().idxmin()
+            valor_mas_cercano = df.loc[indice_mas_cercano, "mes"]
 
-            df_va = df[df['mes'] == valor_mas_cercano]
+            df_va = df[df["mes"] == valor_mas_cercano]
             df_va["ingreso"] = df_va["ingreso"] / valor_mas_cercano * fecha_act
             df_va = df_va.drop(columns=["mes", "semana", "fecha"])
+
             df_fin = df[df["semana"] == 4]
             df_fin = df_fin.drop(columns=["mes", "semana", "fecha"])
+
 
             # Hacer merge por la columna 'proyecto'
             df_merged = pd.merge(df_va, df_fin, on="proyecto", suffixes=("_va", "_fin"))
@@ -2144,7 +2156,7 @@ else:
 
         if promedio_fijo == "LM":
             
-            df_ext = df_2025[df_2025["Mes_A"] == mes_ant]
+            df_ext = df_2025[df_2025["Mes_A"] == mes_ant_lm]
             df_ext = df_ext[~(df_ext["Categoria_A"].isin(costos_variables))]
             if pro != "ESGARI":
                 df_ext = df_ext[df_ext["Proyecto_A"].isin(codigo_pro)]
@@ -2152,8 +2164,8 @@ else:
             df_ext["Mes_A"] = mes_act
             df_ext["Neto_A"] = df_ext["Neto_A"]
             df_sum = df_ext
-            patio_pro = patio(df_2025, [mes_ant], codigo_pro, pro)
-            oh_pro = oh(df_2025, [mes_ant], codigo_pro, pro)
+            patio_pro = patio(df_2025, [mes_ant_lm], codigo_pro, pro)
+            oh_pro = oh(df_2025, [mes_ant_lm], codigo_pro, pro)
          
         elif promedio_fijo == "YTD":
 
@@ -2266,7 +2278,7 @@ else:
             if modo_oh == "Manual (fijo)":
                 oh_pct_elegido = oh_pct_manual
             elif modo_oh == "Mes pasado (LM)":
-                meses_sel = [mes_ant] if mes_ant else []
+                meses_sel = [mes_ant_lm] if mes_ant else []
                 oh_pct_elegido = calcular_pct_oh_hist(meses_sel, df_2025, codigo_pro, pro)
             elif modo_oh == "Promedio 3 meses":
                 meses_sel = ultimos_tres_meses(mes_act, meses_ordenados)
@@ -2330,7 +2342,7 @@ else:
 
 
         elif promedio_variables == "LM":
-            df_ext_var = df_2025[df_2025["Mes_A"] == mes_ant]
+            df_ext_var = df_2025[df_2025["Mes_A"] == mes_ant_lm]
             df_ext_var = df_ext_var[df_ext_var["Categoria_A"].isin(costos_variables)]
             if pro != "ESGARI":
                 df_ext_var = df_ext_var[df_ext_var["Proyecto_A"].isin(codigo_pro)]
@@ -4312,6 +4324,7 @@ else:
         else:
             # Mostrar contenido actual almacenado (sin recargar)
             placeholder.info("Presiona el botón en la barra lateral para recargar el documento.")
+
 
 
 
